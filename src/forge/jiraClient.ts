@@ -49,6 +49,7 @@ function mapSprint(s: RawSprint, boardId?: number): SprintInfo {
 }
 
 const MAX_ISSUES = 2000;
+const MAX_PROJECTS = 2000;
 const MAX_WORKLOG_ISSUES = 150;
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -76,16 +77,27 @@ export const forgeJiraClient: JiraClient = {
   },
 
   async searchProjects(query) {
-    const params = new URLSearchParams({ maxResults: '50', orderBy: 'name', query });
-    const res = await get<{ values: { id: string; key: string; name: string; avatarUrls?: Record<string, string> }[] }>(route`/rest/api/3/project/search?${params}`);
-    return res.values.map((p): JiraProject => ({ id: p.id, key: p.key, name: p.name, avatarUrl: avatar(p.avatarUrls) }));
+    // Jira returns at most 50 projects per page, so keep paging until isLast.
+    const out: JiraProject[] = [];
+    for (let startAt = 0; startAt < MAX_PROJECTS; startAt += 50) {
+      const params = new URLSearchParams({ startAt: String(startAt), maxResults: '50', orderBy: 'name', query });
+      const res = await get<{ values: { id: string; key: string; name: string; avatarUrls?: Record<string, string> }[]; isLast?: boolean }>(route`/rest/api/3/project/search?${params}`);
+      out.push(...res.values.map((p): JiraProject => ({ id: p.id, key: p.key, name: p.name, avatarUrl: avatar(p.avatarUrls) })));
+      if (res.isLast !== false || res.values.length === 0) break;
+    }
+    return out;
   },
 
   async boardsForProject(projectKey) {
-    const params = new URLSearchParams({ projectKeyOrId: projectKey, maxResults: '50' });
-    const res = await get<{ values: { id: number; name: string; type: string; location?: { projectKey?: string } }[] }>(route`/rest/agile/1.0/board?${params}`);
-    // Kanban boards have no sprints.
-    return res.values.filter((b) => b.type !== 'kanban').map((b): JiraBoard => ({ id: b.id, name: b.name, type: b.type, projectKey: b.location?.projectKey }));
+    const out: JiraBoard[] = [];
+    for (let startAt = 0; startAt < 500; startAt += 50) {
+      const params = new URLSearchParams({ projectKeyOrId: projectKey, startAt: String(startAt), maxResults: '50' });
+      const res = await get<{ values: { id: number; name: string; type: string; location?: { projectKey?: string } }[]; isLast?: boolean }>(route`/rest/agile/1.0/board?${params}`);
+      // Kanban boards have no sprints.
+      out.push(...res.values.filter((b) => b.type !== 'kanban').map((b): JiraBoard => ({ id: b.id, name: b.name, type: b.type, projectKey: b.location?.projectKey })));
+      if (res.isLast !== false || res.values.length === 0) break;
+    }
+    return out;
   },
 
   async sprintsForBoard(boardId) {

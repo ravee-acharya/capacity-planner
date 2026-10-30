@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { JiraUser } from '../../../../src/services/ports';
 import type { Template } from '../../../../src/shared/types';
 import { call } from '../bridge';
@@ -31,19 +31,40 @@ export function SprintPicker({ value, onChange, compact }: { value: SprintSelect
     }
   }, [sprints.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [projectQuery, setProjectQuery] = useState('');
+  const shownProjects = useMemo(() => {
+    const q = projectQuery.trim().toLowerCase();
+    const all = projects.data ?? [];
+    if (!q) return all;
+    // Keep the selected project visible so the select never shows a blank value.
+    return all.filter((p) => p.key === value.projectKey || p.name.toLowerCase().includes(q) || p.key.toLowerCase().includes(q));
+  }, [projects.data, projectQuery, value.projectKey]);
+
   const style = compact ? { minWidth: 140 } : { minWidth: 180 };
   return (
     <>
       <div className="field">
         <label htmlFor={`${id}-p`}>Project</label>
-        <select id={`${id}-p`} className="select" style={style} value={value.projectKey ?? ''} onChange={(e) => onChange({ projectKey: e.target.value || undefined })}>
-          <option value="">{projects.loading ? 'Loading…' : projects.error ? 'Could not load projects' : 'Select project'}</option>
-          {projects.data?.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.name} ({p.key})
+        <div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
+          <input
+            className="input"
+            style={{ width: compact ? 90 : 120 }}
+            placeholder="Search…"
+            aria-label="Search projects"
+            value={projectQuery}
+            onChange={(e) => setProjectQuery(e.target.value)}
+          />
+          <select id={`${id}-p`} className="select" style={style} value={value.projectKey ?? ''} onChange={(e) => onChange({ projectKey: e.target.value || undefined })}>
+            <option value="">
+              {projects.loading ? 'Loading…' : projects.error ? 'Could not load projects' : projectQuery ? `${shownProjects.length} matching` : `Select project (${projects.data?.length ?? 0})`}
             </option>
-          ))}
-        </select>
+            {shownProjects.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.name} ({p.key})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="field">
         <label htmlFor={`${id}-b`}>Board</label>
