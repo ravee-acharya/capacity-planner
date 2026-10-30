@@ -1,0 +1,65 @@
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: forge-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck, test and build
+        run: npm run check
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: development
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+    steps:
+      - name: Check Forge credentials
+        id: creds
+        run: |
+          if [ -z "$FORGE_EMAIL" ] || [ -z "$FORGE_API_TOKEN" ]; then
+            echo "::warning::FORGE_EMAIL / FORGE_API_TOKEN secrets are not set; skipping deploy."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.creds.outputs.ok == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.creds.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies and Forge CLI
+        if: steps.creds.outputs.ok == 'true'
+        run: |
+          npm ci
+          npm install -g @forge/cli@15
+          forge settings set usage-analytics false
+      - name: Build UI
+        if: steps.creds.outputs.ok == 'true'
+        run: npm run build
+      - name: Lint manifest
+        if: steps.creds.outputs.ok == 'true'
+        run: forge lint
+      - name: Deploy to Forge development environment
+        if: steps.creds.outputs.ok == 'true'
+        run: forge deploy -e development --non-interactive
