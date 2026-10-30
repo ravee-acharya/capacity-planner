@@ -1,4 +1,4 @@
-name: Test and deploy
+﻿name: Test and deploy
 
 on:
   push:
@@ -14,8 +14,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -41,9 +41,9 @@ jobs:
           else
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.creds.outputs.ok == 'true'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.creds.outputs.ok == 'true'
         with:
           node-version: 22
@@ -62,4 +62,14 @@ jobs:
         run: forge lint
       - name: Deploy to Forge development environment
         if: steps.creds.outputs.ok == 'true'
-        run: forge deploy -e development --non-interactive
+        run: |
+          set +e
+          forge deploy -e development --non-interactive 2>&1 | tee deploy.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Surface Forge's error text as annotations so it is visible without opening the log.
+            grep -v '^\s*$' deploy.log | tail -n 15 | while IFS= read -r line; do
+              echo "::error title=forge deploy::${line//%/%25}"
+            done
+          fi
+          exit "$status"
