@@ -65,6 +65,7 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
 
   return (
     <Modal
+      wide
       title={d.id ? 'Edit template' : 'Create template'}
       onClose={onClose}
       footer={
@@ -277,7 +278,7 @@ export function Templates() {
                   <td className="num">v{t.version}</td>
                   <td className="small">{formatDateTime(t.updatedAt)}</td>
                   <td>
-                    <div className="row" style={{ flexWrap: 'nowrap' }}>
+                    <div className="row" style={{ gap: 4, minWidth: 150 }}>
                       <button className="btn small" onClick={() => navigate('tracking', { templateId: t.id })}>
                         Apply to sprint
                       </button>

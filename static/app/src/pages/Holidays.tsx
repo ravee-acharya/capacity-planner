@@ -52,7 +52,7 @@ export function Holidays() {
           <h3>Company holidays</h3>
           <form
             className="row"
-            style={{ alignItems: 'flex-end' }}
+            style={{ alignItems: 'flex-end', alignContent: 'flex-start' }}
             onSubmit={(e) => {
               e.preventDefault();
               act(() => call('saveHoliday', h), `Added ${h.name.trim()}`, () => {

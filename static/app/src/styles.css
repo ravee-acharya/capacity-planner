@@ -187,6 +187,7 @@ table.t th.sticky { z-index: 3; background: var(--bg-sunken); }
 .overlay { position: fixed; inset: 0; background: #091e427a; display: grid; place-items: center; z-index: 50; padding: 16px; }
 .modal { background: var(--bg-raised); border-radius: 8px; box-shadow: var(--shadow-overlay); width: min(760px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
 .modal.narrow { width: min(460px, 100%); }
+.modal.wide { width: min(1000px, 100%); }
 .modal header, .modal footer { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .modal footer { justify-content: flex-end; }
 .modal .body { padding: 0 20px; overflow: auto; display: grid; gap: 16px; }

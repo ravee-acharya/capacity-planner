@@ -177,6 +177,11 @@ export function createApi(ctx: Ctx) {
       config = t;
       templateName = t.name;
     }
+    // Never mix units: an hours report over a story-point plan would show zero capacity.
+    if (config.unit !== unit) {
+      const planned = config.unit === 'hours' ? 'hours' : 'story points';
+      throw new ValidationError([`${sprint.name}: “${templateName}” is planned in ${planned}. Switch Capacity type to ${planned === 'hours' ? 'Hours' : 'Story points'} to report on it.`]);
+    }
     const spField = unit === 'points' ? await storyPointsField(row.boardId, settings) : undefined;
     if (unit === 'points' && !spField) throw new ValidationError([`${sprint.name}: no story point field is configured for this board.`]);
     const items = await ctx.jira.sprintIssues(row.sprintId, spField);

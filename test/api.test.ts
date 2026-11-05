@@ -119,6 +119,15 @@ describe('reports', () => {
     expect(s.weekly?.byMember['u-asha']['2026-11-02'].spent).toBe(8);
   });
 
+  it('refuses to report a plan in a different unit', async () => {
+    const { api } = setup();
+    const t = await api.createTemplate(template());
+    await api.applyTemplate({ boardId: 1, sprintId: 102, templateId: t.id });
+    const report = await api.computeReport({ unit: 'points', rows: [{ boardId: 1, sprintId: 102 }] });
+    expect(report.sprints).toHaveLength(0);
+    expect(report.errors[0]).toMatch(/planned in hours\. Switch Capacity type to Hours/);
+  });
+
   it('reports per-row errors without failing the whole report', async () => {
     const { api } = setup();
     const t = await api.createTemplate(template());

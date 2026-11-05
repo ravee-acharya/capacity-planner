@@ -60,7 +60,7 @@ export function Field({ label, help, children, htmlFor }: { label: string; help?
   );
 }
 
-export function Modal({ title, onClose, children, footer, narrow }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; narrow?: boolean }) {
+export function Modal({ title, onClose, children, footer, narrow, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; narrow?: boolean; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   useEffect(() => {
@@ -75,7 +75,7 @@ export function Modal({ title, onClose, children, footer, narrow }: { title: str
   }, [onClose]);
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${narrow ? ' narrow' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} ref={ref}>
+      <div className={`modal${narrow ? ' narrow' : ''}${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} ref={ref}>
         <header>
           <h2 id={id}>{title}</h2>
           <button className="btn subtle" data-close onClick={onClose} aria-label="Close">

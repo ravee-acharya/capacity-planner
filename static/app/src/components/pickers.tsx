@@ -13,12 +13,25 @@ export interface SprintSelection {
 
 const STATE_LABEL = { active: 'Active', future: 'Future', closed: 'Closed' } as const;
 
+// Projects, boards and sprints change rarely; reuse them across pages for a few minutes
+// instead of re-reading every page of projects from Jira on each navigation.
+const CACHE_MS = 5 * 60_000;
+const lookupCache = new Map<string, { at: number; value: Promise<unknown> }>();
+function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = lookupCache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value as Promise<T>;
+  const value = load();
+  lookupCache.set(key, { at: Date.now(), value });
+  value.catch(() => lookupCache.delete(key));
+  return value;
+}
+
 /** Cascading Project → Board → Sprint selector backed by Jira. */
 export function SprintPicker({ value, onChange, compact }: { value: SprintSelection; onChange: (v: SprintSelection) => void; compact?: boolean }) {
   const id = useId();
-  const projects = useAsync(() => call('searchProjects', { query: '' }), []);
-  const boards = useAsync(() => (value.projectKey ? call('getBoards', { projectKey: value.projectKey }) : Promise.resolve([])), [value.projectKey]);
-  const sprints = useAsync(() => (value.boardId ? call('getSprints', { boardId: value.boardId }) : Promise.resolve([])), [value.boardId]);
+  const projects = useAsync(() => cached('projects', () => call('searchProjects', { query: '' })), []);
+  const boards = useAsync(() => (value.projectKey ? cached(`boards:${value.projectKey}`, () => call('getBoards', { projectKey: value.projectKey! })) : Promise.resolve([])), [value.projectKey]);
+  const sprints = useAsync(() => (value.boardId ? cached(`sprints:${value.boardId}`, () => call('getSprints', { boardId: value.boardId! })) : Promise.resolve([])), [value.boardId]);
 
   // Auto-select the only board, and the active sprint, to save clicks.
   useEffect(() => {

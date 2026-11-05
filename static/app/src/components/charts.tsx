@@ -34,7 +34,9 @@ export function GroupedBars({ categories, series, values, unit, title }: { categ
   const [hover, setHover] = useState<{ c: number; s: number } | null>(null);
   if (categories.length === 0) return null;
   const max = niceMax(Math.max(0, ...values.flat()));
-  const groupW = Math.max(48, series.length * 18 + 20);
+  // Wide enough for a readable name under each group; longer names are truncated to fit.
+  const groupW = Math.max(88, series.length * 18 + 20);
+  const maxChars = Math.floor((groupW - 4) / 6.2);
   const left = 48;
   const width = left + categories.length * groupW + 8;
   const height = 220;
@@ -78,7 +80,8 @@ export function GroupedBars({ categories, series, values, unit, title }: { categ
                 );
               })}
               <text x={(groupW - 20) / 2} y={height - 18} textAnchor="middle">
-                {c.length > 12 ? `${c.slice(0, 11)}…` : c}
+                <title>{c}</title>
+                {c.length > maxChars ? `${c.slice(0, maxChars - 1)}…` : c}
               </text>
             </g>
           ))}
