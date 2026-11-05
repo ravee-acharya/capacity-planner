@@ -102,14 +102,14 @@ export function reportToCsv(report: Report): string {
   const u = report.unit === 'hours' ? 'hours' : 'points';
   const headers = [
     'Sprint', 'Sprint start', 'Sprint end', 'Template', 'Team member', 'Role', 'In template',
-    'Available days', `Capacity per day (${u})`, 'Focus', `Total capacity (${u})`, `Allocated work (${u})`,
+    'Available days', `Capacity per day (${u})`, 'Focus', 'Allocation %', 'Location', `Total capacity (${u})`, `Allocated work (${u})`,
     'Time spent (hours)', `Remaining capacity (${u})`, `Remaining work (${u})`, `Balance (${u})`,
     'Utilisation %', 'Time-spent utilisation %', 'Status', 'Issues', 'Unestimated issues',
   ];
   const rows = report.sprints.flatMap((s) =>
     s.result.members.map((m) => [
       s.sprint.name, s.result.start, s.result.end, s.templateName, m.displayName, m.role, m.inTemplate ? 'Yes' : 'No',
-      m.availableDays, n(m.capacityPerDay), n(m.focus), n(m.totalCapacity), n(m.allocated),
+      m.availableDays, n(m.capacityPerDay), n(m.focus), m.allocation ?? 100, m.location ?? '', n(m.totalCapacity), n(m.allocated),
       n(m.timeSpent), n(m.remainingCapacity), n(m.remainingWork), n(m.balance),
       n(m.utilization), n(m.spentUtilization), m.status, m.issueKeys.length, m.unestimatedCount,
     ]),

@@ -43,6 +43,8 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
   const setC = (patch: Partial<TemplateConfig>) => setD({ ...d, config: { ...c, ...patch } });
   const setMember = (i: number, patch: Partial<TemplateMember>) => setC({ members: c.members.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
   const problems = validateTemplateInput({ name: d.name, description: d.description, ...c });
+  const holidays = useAsync(() => call('listHolidays'), []);
+  const knownLocations = [...new Set([...(holidays.data ?? []).map((h) => h.location), ...c.members.map((m) => m.location)].filter((l): l is string => Boolean(l?.trim())))].sort();
   const unitLabel = c.unit === 'hours' ? 'hours' : 'points';
 
   const save = async () => {
@@ -136,6 +138,10 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
                   <th>Role</th>
                   <th className="num">Capacity / day</th>
                   <th className="num">Focus</th>
+                  <th className="num" title="Share of this person's time given to this team">
+                    Allocation %
+                  </th>
+                  <th title="Holiday calendar this person follows">Location</th>
                   <th className="num">Effective / day</th>
                   <th>
                     <span className="sr-only">Remove</span>
@@ -144,7 +150,7 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
               </thead>
               <tbody>
                 {c.members.map((m, i) => {
-                  const eff = (m.capacityPerDay ?? c.defaultCapacityPerDay) * (m.focus ?? c.defaultFocus);
+                  const eff = (m.capacityPerDay ?? c.defaultCapacityPerDay) * (m.focus ?? c.defaultFocus) * ((m.allocation ?? 100) / 100);
                   return (
                     <tr key={m.accountId}>
                       <td>
@@ -159,6 +165,12 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
                       <td className="num">
                         <input className="input compact" type="number" min={0} max={1} step={0.05} placeholder={String(c.defaultFocus)} aria-label={`Focus for ${m.displayName}`} value={m.focus ?? ''} onChange={(e) => setMember(i, { focus: parseOptional(e.target.value) })} />
                       </td>
+                      <td className="num">
+                        <input className="input compact" type="number" min={0} max={100} step={5} placeholder="100" aria-label={`Allocation % for ${m.displayName}`} value={m.allocation ?? ''} onChange={(e) => setMember(i, { allocation: parseOptional(e.target.value) })} />
+                      </td>
+                      <td>
+                        <input className="input" style={{ width: 110 }} maxLength={40} list="cp-locations" placeholder="All" aria-label={`Location for ${m.displayName}`} value={m.location ?? ''} onChange={(e) => setMember(i, { location: e.target.value || undefined })} />
+                      </td>
                       <td className="num">{Number.isFinite(eff) ? formatValue(eff, c.unit) : '—'}</td>
                       <td>
                         <button className="btn subtle small" aria-label={`Remove ${m.displayName}`} onClick={() => setC({ members: c.members.filter((_, j) => j !== i) })}>
@@ -172,8 +184,14 @@ function TemplateEditor({ initial, onClose, onSaved }: { initial: Draft; onClose
             </table>
           </div>
         )}
+        <datalist id="cp-locations">
+          {knownLocations.map((l) => (
+            <option key={l} value={l} />
+          ))}
+        </datalist>
         <p className="small muted" style={{ margin: 0 }}>
-          Leave capacity or focus blank to use the template defaults.
+          Leave capacity or focus blank to use the template defaults. Allocation % is the share of the person's time given to this team (blank = 100%); if they also work in another
+          team's sprint at the same time, the two allocations should add up to 100%. Location picks which location-specific holidays apply.
         </p>
       </div>
     </Modal>

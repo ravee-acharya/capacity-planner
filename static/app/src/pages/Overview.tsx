@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { expandRanges } from '../../../../src/shared/dates';
-import { calculateCapacity, formatPercent, formatValue } from '../../../../src/shared/engine';
+import { calculateCapacity, formatPercent, formatValue, holidayInputs } from '../../../../src/shared/engine';
 import { rolesOf } from '../../../../src/shared/report';
 import { call } from '../bridge';
 import { Donut, GroupedBars, PALETTE, UtilisationBars } from '../components/charts';
@@ -32,7 +32,7 @@ export function Overview() {
       end: ws.data.sprint.endDate ?? plan?.periodEnd,
       today: app.today,
       config,
-      holidays: [...ws.data.holidays.map((h) => h.date), ...(plan?.teamHolidays ?? [])],
+      ...holidayInputs(ws.data.holidays, plan?.teamHolidays),
       leaves,
       overrides: plan?.overrides,
       items: ws.data.items,

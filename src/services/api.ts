@@ -1,9 +1,11 @@
 // Every resolver the frontend can invoke. Pure business logic over the Ctx ports, so the
 // same code runs in Forge, in unit tests and in the local demo.
+import { otherCommitments, type OtherCommitment } from '../shared/commitments';
 import { eachDate, expandRanges, isDateStr, toDateStr, weekStart } from '../shared/dates';
-import { calculateCapacity, DEFAULT_SETTINGS } from '../shared/engine';
+import { allocatedOf, calculateCapacity, DEFAULT_SETTINGS, holidayInputs, isCounted, locationKey } from '../shared/engine';
+import { calibrateMember, velocityForecast, type HistorySprint, type MemberCalibration, type MemberSample, type VelocityForecast } from '../shared/forecast';
 import { compactReport, type Report, type ReportParams, type SavedReport, type SavedReportSummary, type SprintReport, type WeeklySpent } from '../shared/report';
-import type { DateStr, Holiday, Leave, Settings, SprintInfo, SprintPlan, Template, TemplateConfig, WorkItem } from '../shared/types';
+import type { DateStr, Holiday, Leave, Settings, SprintInfo, SprintPlan, Template, TemplateConfig, Unit, WorkItem } from '../shared/types';
 import { normaliseWorkingDays, validateDateRange, validateSettings, validateTemplateInput, ValidationError } from '../shared/validation';
 import type { Ctx } from './ports';
 
@@ -50,6 +52,30 @@ export interface Workspace {
   settings: Settings;
   storyPointsField?: string;
   templateVersion?: number;
+  /** Other sprint plans overlapping this sprint, per person (for over-commitment warnings). */
+  commitments: Record<string, OtherCommitment[]>;
+}
+
+export interface ForecastMember extends MemberCalibration {
+  accountId: string;
+  displayName: string;
+  avatarUrl?: string;
+  configuredFocus: number;
+  totalCapacity: number;
+  allocated: number;
+  /** Allocated work scaled by the person's estimate bias (hours only). */
+  riskAdjusted: number | null;
+}
+
+export interface Forecast {
+  unit: Unit;
+  generatedAt: string;
+  history: HistorySprint[];
+  velocity: VelocityForecast | null;
+  capacity: number;
+  committed: number;
+  members: ForecastMember[];
+  warnings: string[];
 }
 
 export interface TemplateInput {
@@ -71,6 +97,8 @@ function sanitiseConfig(config: TemplateConfig): TemplateConfig {
       role: m.role ? String(m.role).trim().slice(0, 60) : undefined,
       capacityPerDay: m.capacityPerDay ?? null,
       focus: m.focus ?? null,
+      allocation: m.allocation ?? null,
+      location: m.location ? String(m.location).trim().slice(0, 40) || undefined : undefined,
     })),
   };
 }
@@ -158,7 +186,7 @@ export function createApi(ctx: Ctx) {
       end: usePlan ? (sprint.endDate ?? plan.periodEnd) : sprint.endDate,
       today: today(),
       config,
-      holidays: [...holidays.map((h) => h.date), ...(usePlan ? plan.teamHolidays : [])],
+      ...holidayInputs(holidays, usePlan ? plan.teamHolidays : []),
       leaves,
       overrides: usePlan ? plan.overrides : undefined,
       items,
@@ -190,6 +218,142 @@ export function createApi(ctx: Ctx) {
       }
     }
     return { params: { unit: params.unit, rows }, unit: params.unit, generatedAt: nowIso(), sprints, errors };
+  }
+
+  /**
+   * Forecast for a sprint from the board's recently closed sprints: capacity-adjusted velocity,
+   * plus per-person measured focus and estimate bias. Uses each past sprint's own plan when it
+   * has one, otherwise the current configuration.
+   */
+  async function getForecast(p: { boardId: number; sprintId: number; templateId?: string; sprints?: number }): Promise<Forecast> {
+    const boardId = Number(p.boardId);
+    const sprintId = Number(p.sprintId);
+    const want = Math.min(Math.max(Number(p.sprints) || 6, 2), 8);
+    const settings = await getSettings();
+    const [sprint, plan, allSprints, holidays, leaves, spField] = await Promise.all([
+      ctx.jira.sprint(sprintId),
+      ctx.store.get<SprintPlan>(K.plan(sprintId)),
+      ctx.jira.sprintsForBoard(boardId),
+      ctx.store.list<Holiday>('hol:'),
+      leavesByMember(),
+      storyPointsField(boardId, settings),
+    ]);
+    const config: TemplateConfig | undefined = plan?.config ?? (p.templateId ? await getTemplate(p.templateId) : undefined);
+    if (!config) throw new ValidationError(['Apply a template to this sprint (or choose one) before forecasting.']);
+    const unit = config.unit;
+    const warnings: string[] = [];
+    if (unit === 'points' && !spField) throw new ValidationError(['No story point field is configured for this board.']);
+
+    const past = allSprints
+      .filter((s) => s.state === 'closed' && s.id !== sprintId && s.startDate && s.endDate)
+      .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))
+      .slice(0, want);
+    if (past.length === 0) warnings.push('This board has no closed sprints with dates yet, so there is no history to learn from.');
+
+    const memberIds = new Set(config.members.map((m) => m.accountId));
+    const samples = new Map<string, MemberSample[]>();
+    const history: HistorySprint[] = [];
+    let usedFallbackConfig = 0;
+
+    // Three sprints at a time keeps well inside the resolver time limit.
+    for (let i = 0; i < past.length; i += 3) {
+      const batch = past.slice(i, i + 3);
+      const loaded = await Promise.all(
+        batch.map(async (s) => ({ s, items: await ctx.jira.sprintIssues(s.id, spField), own: await ctx.store.get<SprintPlan>(K.plan(s.id)) })),
+      );
+      for (const { s, items, own } of loaded) {
+        const histConfig: TemplateConfig = own && own.config.unit === unit ? own.config : config;
+        if (histConfig === config) usedFallbackConfig += 1;
+        const result = calculateCapacity({
+          unit,
+          start: s.startDate,
+          end: s.endDate,
+          today: s.endDate!,
+          config: histConfig,
+          ...holidayInputs(holidays, own?.teamHolidays),
+          leaves,
+          overrides: own?.overrides,
+          items,
+          settings,
+        });
+        const finishedBy = s.completeDate ?? s.endDate!;
+        const counted = items.filter((it) => isCounted(it, s.startDate, settings));
+        const done = counted.filter((it) => it.statusCategory === 'done' && (!it.doneDate || it.doneDate <= finishedBy));
+        const sum = (list: WorkItem[]) => list.reduce((acc, it) => acc + (allocatedOf(it, unit) ?? 0), 0);
+        const capacity = result.totals.totalCapacity;
+        history.push({
+          id: s.id,
+          name: s.name,
+          start: s.startDate!,
+          end: s.endDate!,
+          capacity,
+          completed: sum(done),
+          committed: sum(counted),
+          rate: capacity > 0 ? sum(done) / capacity : null,
+        });
+        for (const m of result.members) {
+          if (!memberIds.has(m.accountId)) continue;
+          const mine = done.filter((it) => it.assigneeId === m.accountId && (it.originalEstimateSec ?? 0) > 0 && (it.timeSpentSec ?? 0) > 0);
+          const list = samples.get(m.accountId) ?? [];
+          list.push({
+            rawCapacityHours: unit === 'hours' ? m.rawCapacity : 0,
+            spentHours: m.timeSpent,
+            estimatedSec: mine.reduce((acc, it) => acc + (it.originalEstimateSec ?? 0), 0),
+            spentOnEstimatedSec: mine.reduce((acc, it) => acc + (it.timeSpentSec ?? 0), 0),
+            estimatedIssues: mine.length,
+          });
+          samples.set(m.accountId, list);
+        }
+      }
+    }
+    if (usedFallbackConfig > 0 && past.length > 0) {
+      warnings.push(`${usedFallbackConfig} of ${past.length} past sprints had no saved plan, so today's template was used for their capacity.`);
+    }
+    if (unit === 'points') warnings.push('Measured focus needs hour-based capacity, so it is only shown for hours templates.');
+
+    // This sprint, as planned now.
+    const items = await ctx.jira.sprintIssues(sprintId, spField);
+    const current = calculateCapacity({
+      unit,
+      start: sprint.startDate ?? plan?.periodStart,
+      end: sprint.endDate ?? plan?.periodEnd,
+      today: today(),
+      config,
+      ...holidayInputs(holidays, plan?.teamHolidays),
+      leaves,
+      overrides: plan?.overrides,
+      items,
+      settings,
+    });
+    const committed = current.totals.allocated + current.totals.unassignedAllocated;
+
+    const members = current.members
+      .filter((m) => m.inTemplate)
+      .map((m): ForecastMember => {
+        const cal = calibrateMember(samples.get(m.accountId) ?? []);
+        const bias = unit === 'hours' ? cal.estimateBias : null;
+        return {
+          accountId: m.accountId,
+          displayName: m.displayName,
+          avatarUrl: m.avatarUrl,
+          configuredFocus: m.focus,
+          ...cal,
+          totalCapacity: m.totalCapacity,
+          allocated: m.allocated,
+          riskAdjusted: bias !== null ? m.allocated * bias : null,
+        };
+      });
+
+    return {
+      unit,
+      generatedAt: nowIso(),
+      history: history.sort((a, b) => a.end.localeCompare(b.end)),
+      velocity: velocityForecast(history, current.totals.totalCapacity, committed),
+      capacity: current.totals.totalCapacity,
+      committed,
+      members,
+      warnings,
+    };
   }
 
   function summarise(r: SavedReport): SavedReportSummary {
@@ -304,9 +468,13 @@ export function createApi(ctx: Ctx) {
         ctx.store.list<Leave>('leave:'),
         storyPointsField(Number(p.boardId), settings),
       ]);
-      const items = await ctx.jira.sprintIssues(sprint.id, spField);
-      const tpl = plan ? await ctx.store.get<Template>(K.template(plan.templateId)) : undefined;
-      return { sprint, plan: plan ?? null, items, holidays, leaves, settings, storyPointsField: spField, templateVersion: tpl?.version };
+      const [items, tpl, plans] = await Promise.all([
+        ctx.jira.sprintIssues(sprint.id, spField),
+        plan ? ctx.store.get<Template>(K.template(plan.templateId)) : Promise.resolve(undefined),
+        ctx.store.list<SprintPlan>('plan:'),
+      ]);
+      const commitments = otherCommitments(plans, { sprintId: sprint.id, start: sprint.startDate ?? plan?.periodStart, end: sprint.endDate ?? plan?.periodEnd });
+      return { sprint, plan: plan ?? null, items, holidays, leaves, settings, storyPointsField: spField, templateVersion: tpl?.version, commitments };
     },
 
     async applyTemplate(p: { boardId: number; sprintId: number; templateId: string }) {
@@ -325,6 +493,8 @@ export function createApi(ctx: Ctx) {
         overrides,
         periodStart: existing?.periodStart,
         periodEnd: existing?.periodEnd,
+        start: sprint.startDate ?? existing?.periodStart,
+        end: sprint.endDate ?? existing?.periodEnd,
         updatedAt: nowIso(),
         updatedBy: ctx.accountId,
       };
@@ -354,6 +524,7 @@ export function createApi(ctx: Ctx) {
         }
       }
       if (problems.length) throw new ValidationError([...new Set(problems)]);
+      const sprint = await ctx.jira.sprint(existing.sprintId).catch(() => undefined);
       const plan: SprintPlan = {
         ...existing,
         config: sanitiseConfig(config),
@@ -361,6 +532,8 @@ export function createApi(ctx: Ctx) {
         overrides,
         periodStart: input.periodStart || undefined,
         periodEnd: input.periodEnd || undefined,
+        start: sprint?.startDate ?? (input.periodStart || undefined),
+        end: sprint?.endDate ?? (input.periodEnd || undefined),
         updatedAt: nowIso(),
         updatedBy: ctx.accountId,
       };
@@ -377,16 +550,19 @@ export function createApi(ctx: Ctx) {
     async listHolidays() {
       return (await ctx.store.list<Holiday>('hol:')).sort((a, b) => a.date.localeCompare(b.date));
     },
-    async saveHoliday(p: { id?: string; date: string; name: string }) {
+    async saveHoliday(p: { id?: string; date: string; name: string; location?: string }) {
       const problems: string[] = [];
       if (!isDateStr(p?.date)) problems.push('Enter a valid holiday date.');
       const name = String(p?.name ?? '').trim();
       if (!name) problems.push('Holiday name is required.');
       if (name.length > 80) problems.push('Holiday name must be 80 characters or fewer.');
+      const location = String(p?.location ?? '').trim() || undefined;
+      if (location && location.length > 40) problems.push('Location must be 40 characters or fewer.');
       if (problems.length) throw new ValidationError(problems);
       const existing = await ctx.store.list<Holiday>('hol:');
-      if (existing.some((h) => h.date === p.date && h.id !== p.id)) throw new ValidationError([`There is already a holiday on ${p.date}.`]);
-      const h: Holiday = { id: p.id || ctx.newId(), date: p.date, name };
+      const clash = existing.find((h) => h.date === p.date && h.id !== p.id && locationKey(h.location) === locationKey(location));
+      if (clash) throw new ValidationError([`There is already a${location ? ` ${location}` : ' company-wide'} holiday on ${p.date}.`]);
+      const h: Holiday = { id: p.id || ctx.newId(), date: p.date, name, location };
       await ctx.store.set(K.holiday(h.id), h);
       return h;
     },
@@ -439,6 +615,9 @@ export function createApi(ctx: Ctx) {
       await ctx.store.set(K.settings, clean);
       return clean;
     },
+
+    // ---- Forecast ----
+    getForecast,
 
     // ---- Reports ----
     computeReport,

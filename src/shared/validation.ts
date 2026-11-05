@@ -42,6 +42,8 @@ export function validateTemplateInput(input: { name?: unknown; description?: unk
       else seen.add(m.accountId);
       checkNumber(problems, `Capacity per day for ${label}`, m?.capacityPerDay, 0, MAX_PER_DAY[unit], true);
       checkNumber(problems, `Focus for ${label}`, m?.focus, 0, 1, true);
+      checkNumber(problems, `Allocation for ${label}`, m?.allocation, 0, 100, true);
+      if (m?.location && String(m.location).length > 40) problems.push(`Location for ${label} must be 40 characters or fewer.`);
       if (m?.role && String(m.role).length > 60) problems.push(`Role for ${label} must be 60 characters or fewer.`);
     });
   }

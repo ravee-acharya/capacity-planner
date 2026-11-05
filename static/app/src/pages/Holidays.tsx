@@ -11,7 +11,9 @@ export function Holidays() {
   const holidays = useAsync(() => call('listHolidays'), []);
   const leaves = useAsync(() => call('listLeaves'), []);
   const [error, setError] = useState<unknown>();
-  const [h, setH] = useState({ date: '', name: '' });
+  const [h, setH] = useState({ date: '', name: '', location: '' });
+  const templates = useAsync(() => call('listTemplates'), []);
+  const locations = [...new Set([...(templates.data ?? []).flatMap((t) => t.members.map((m) => m.location)), ...(holidays.data ?? []).map((x) => x.location)].filter((x): x is string => Boolean(x?.trim())))].sort();
   const [who, setWho] = useState<JiraUser>();
   const [l, setL] = useState({ from: '', to: '', note: '' });
   const [showPast, setShowPast] = useState(false);
@@ -35,7 +37,10 @@ export function Holidays() {
       <div className="page-header">
         <div>
           <h1>Holidays &amp; leave</h1>
-          <p>Company holidays apply to every sprint plan. Leave applies to one person across all plans. Each day is removed from capacity only once.</p>
+          <p>
+            Holidays apply to every sprint plan: to everyone, or only to people whose template location matches. Leave applies to one person across all plans. Each day is
+            removed from capacity only once.
+          </p>
         </div>
         <label className="check">
           <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> Show past entries
@@ -51,7 +56,7 @@ export function Holidays() {
             onSubmit={(e) => {
               e.preventDefault();
               act(() => call('saveHoliday', h), `Added ${h.name.trim()}`, () => {
-                setH({ date: '', name: '' });
+                setH({ date: '', name: '', location: h.location });
                 holidays.reload();
               });
             }}
@@ -62,6 +67,14 @@ export function Holidays() {
             <Field label="Name" htmlFor="h-name">
               <input id="h-name" className="input" required maxLength={80} placeholder="e.g. Diwali" value={h.name} onChange={(e) => setH({ ...h, name: e.target.value })} />
             </Field>
+            <Field label="Location (optional)" htmlFor="h-loc">
+              <input id="h-loc" className="input" style={{ width: 130 }} maxLength={40} list="h-locations" placeholder="Everyone" value={h.location} onChange={(e) => setH({ ...h, location: e.target.value })} />
+            </Field>
+            <datalist id="h-locations">
+              {locations.map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
             <button className="btn primary" type="submit" disabled={!isDateStr(h.date) || !h.name.trim()}>
               Add holiday
             </button>
@@ -77,6 +90,7 @@ export function Holidays() {
                   <tr>
                     <th>Date</th>
                     <th>Holiday</th>
+                    <th>Applies to</th>
                     <th>
                       <span className="sr-only">Actions</span>
                     </th>
@@ -89,6 +103,7 @@ export function Holidays() {
                         {formatDate(x.date)} <span className="muted small">{WEEKDAY_SHORT[weekday(x.date)]}</span>
                       </td>
                       <td>{x.name}</td>
+                      <td className="small">{x.location ? <span className="lozenge info">{x.location}</span> : <span className="muted">Everyone</span>}</td>
                       <td>
                         <button className="btn small subtle" aria-label={`Delete ${x.name}`} onClick={() => act(() => call('deleteHoliday', { id: x.id }), `Removed ${x.name}`, holidays.reload)}>
                           Delete

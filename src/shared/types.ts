@@ -18,6 +18,10 @@ export interface TemplateMember {
   capacityPerDay: number | null;
   /** Fraction of the day spent on sprint work (0..1). null = use the template default. */
   focus: number | null;
+  /** Share of this person given to this team (0..100). Missing/null = 100%. */
+  allocation?: number | null;
+  /** Holiday calendar this person follows, e.g. "India". Missing = company-wide holidays only. */
+  location?: string;
 }
 
 export interface TemplateConfig {
@@ -43,6 +47,8 @@ export interface Holiday {
   id: string;
   date: DateStr;
   name: string;
+  /** When set, the holiday only applies to members with this location. */
+  location?: string;
 }
 
 export interface Leave {
@@ -73,6 +79,9 @@ export interface SprintPlan {
   /** Used when the sprint has no start/end dates (future sprints). */
   periodStart?: DateStr;
   periodEnd?: DateStr;
+  /** Effective plan dates, recorded on save so overlapping plans can be found without Jira calls. */
+  start?: DateStr;
+  end?: DateStr;
   updatedAt: string;
   updatedBy: string;
 }

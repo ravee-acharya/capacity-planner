@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { expandRanges, isDateStr, weekday, WEEKDAY_SHORT } from '../../../../src/shared/dates';
-import { allocatedOf, calculateCapacity, formatPercent, formatValue, isCounted, type MemberCapacity } from '../../../../src/shared/engine';
+import { allocatedOf, calculateCapacity, formatPercent, formatValue, holidayInputs, isCounted, type MemberCapacity } from '../../../../src/shared/engine';
 import type { SprintPlan } from '../../../../src/shared/types';
 import { MAX_PER_DAY } from '../../../../src/shared/validation';
 import { call } from '../bridge';
+import { overCommitted } from '../../../../src/shared/commitments';
+import { ForecastPanel } from '../components/ForecastPanel';
 import { SprintPicker, TemplateSelect } from '../components/pickers';
 import { Empty, ErrorMessage, Field, Message, Meter, Spinner, Stat, StatusLozenge, UnitBadge, Who } from '../components/ui';
 import { formatDate, useApp, useAsync } from '../hooks';
@@ -45,7 +47,7 @@ export function Tracking() {
       end: sprint.endDate ?? draft.periodEnd,
       today: app.today,
       config: draft.config,
-      holidays: [...holidays.map((h) => h.date), ...draft.teamHolidays],
+      ...holidayInputs(holidays, draft.teamHolidays),
       leaves: byMember,
       overrides: draft.overrides,
       items,
@@ -53,12 +55,26 @@ export function Tracking() {
     });
   }, [ws.data, draft, app.today]);
 
-  const holidayNames = useMemo(() => {
-    const m = new Map<string, string>();
-    ws.data?.holidays.forEach((h) => m.set(h.date, h.name));
-    draft?.teamHolidays.forEach((d) => m.set(d, m.get(d) ?? 'Team holiday'));
-    return m;
+  // Header shading marks company-wide days only; location holidays show in each person's row.
+  const { holidayNames, teamHolidaySet } = useMemo(() => {
+    const names = new Map<string, string>();
+    const team = new Set<string>(draft?.teamHolidays ?? []);
+    for (const h of ws.data?.holidays ?? []) {
+      const label = h.location ? `${h.name} (${h.location})` : h.name;
+      names.set(h.date, names.has(h.date) ? `${names.get(h.date)}; ${label}` : label);
+      if (!h.location) team.add(h.date);
+    }
+    draft?.teamHolidays.forEach((d) => names.set(d, names.get(d) ?? 'Team holiday'));
+    return { holidayNames: names, teamHolidaySet: team };
   }, [ws.data, draft]);
+
+  const overCommits = useMemo(() => (draft && ws.data ? overCommitted(draft.config, ws.data.commitments ?? {}) : []), [draft, ws.data]);
+
+  const useFocus = (changes: Record<string, number>) => {
+    if (!draft) return;
+    setDraft({ ...draft, config: { ...draft.config, members: draft.config.members.map((m) => (changes[m.accountId] !== undefined ? { ...m, focus: changes[m.accountId] } : m)) } });
+    toast(`Updated focus for ${Object.keys(changes).length} person(s) – save the plan to keep it`);
+  };
 
   const rows = useMemo(() => {
     if (!result) return [];
@@ -298,6 +314,22 @@ export function Tracking() {
                   {w}
                 </Message>
               ))}
+              {overCommits.length > 0 && (
+                <Message tone="error" title="Some people are committed to more than 100% across teams">
+                  <ul>
+                    {overCommits.map((c) => (
+                      <li key={c.accountId}>
+                        <strong>{c.displayName}</strong>: {c.here}% here +{' '}
+                        {c.others.map((o) => `${o.allocation}% in ${o.sprintName} (${o.templateName})`).join(' + ')} = <strong>{c.total}%</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  Set each person's allocation % in the template (or here) so their time is not counted twice.
+                </Message>
+              )}
+              {sel.boardId && sel.sprintId && (
+                <ForecastPanel boardId={sel.boardId} sprintId={sel.sprintId} templateId={draft.templateId} dirty={dirty} onUseFocus={useFocus} />
+              )}
               {(result.totals.unassignedCount > 0 || result.totals.unestimatedCount > 0) && (
                 <Message>
                   {result.totals.unassignedCount > 0 && `${result.totals.unassignedCount} issue(s) totalling ${f(result.totals.unassignedAllocated)} are unassigned. `}
@@ -345,7 +377,7 @@ export function Tracking() {
                         <th className="sticky">Team member</th>
                         <th>Role</th>
                         {result.dates.map((d) => (
-                          <th key={d} className={`day${holidayNames.has(d) ? ' holiday' : ''}${d === app.today ? ' today' : ''}`} title={holidayNames.get(d)}>
+                          <th key={d} className={`day${teamHolidaySet.has(d) ? ' holiday' : ''}${d === app.today ? ' today' : ''}`} title={holidayNames.get(d)}>
                             {d.slice(8)}/{d.slice(5, 7)}
                             <span className="dow">{WEEKDAY_SHORT[weekday(d)]}</span>
                           </th>
@@ -367,7 +399,14 @@ export function Tracking() {
                             <td className="sticky">
                               <Who name={m.displayName} url={m.avatarUrl} note={!m.inTemplate ? <span className="lozenge neutral" title="Has sprint work but is not in the template">Not in template</span> : undefined} />
                             </td>
-                            <td className="small">{m.role}</td>
+                            <td className="small">
+                              {m.role}
+                              {(m.allocation < 100 || m.location) && m.inTemplate && (
+                                <div className="muted">
+                                  {[m.allocation < 100 ? `${m.allocation}% here` : '', m.location ?? ''].filter(Boolean).join(' · ')}
+                                </div>
+                              )}
+                            </td>
                             {m.days.map((d, c) =>
                               d.kind === 'working' && m.inTemplate ? (
                                 <td key={d.date} className={`day${d.overridden ? ' overridden' : ''}${d.date === app.today ? ' today' : ''}`}>

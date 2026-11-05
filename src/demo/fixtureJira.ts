@@ -35,11 +35,30 @@ export function fixtureJira(today: string, me: JiraUser = DEMO_USERS[0], admin =
   const [asha, ben, chen, dana, eli] = DEMO_USERS;
   const monday = weekStart(today);
   const sprints: SprintInfo[] = [
+    { id: 99, boardId: 1, name: 'APP Sprint 10', state: 'closed', startDate: addDays(monday, -42), endDate: addDays(monday, -31) },
+    { id: 100, boardId: 1, name: 'APP Sprint 11', state: 'closed', startDate: addDays(monday, -28), endDate: addDays(monday, -17) },
     { id: 101, boardId: 1, name: 'APP Sprint 12', state: 'closed', startDate: addDays(monday, -14), endDate: addDays(monday, -3) },
     { id: 102, boardId: 1, name: 'APP Sprint 13', state: 'active', startDate: monday, endDate: addDays(monday, 11) },
     { id: 103, boardId: 1, name: 'APP Sprint 14', state: 'future' },
   ];
   const issues: Record<number, WorkItem[]> = {
+    // History: Asha and Chen overrun their estimates, Ben is accurate; some work spills over.
+    99: [
+      item('APP-30', asha, 20, 26, 0, 5, 'done'),
+      item('APP-31', asha, 10, 13, 0, 2, 'done'),
+      item('APP-32', ben, 24, 24, 0, 5, 'done'),
+      item('APP-33', ben, 8, 8, 0, 2, 'done'),
+      item('APP-34', chen, 16, 22, 0, 3, 'done'),
+      item('APP-35', chen, 20, 6, 14, 5),
+    ],
+    100: [
+      item('APP-7', asha, 16, 21, 0, 3, 'done'),
+      item('APP-8', asha, 12, 15, 0, 3, 'done'),
+      item('APP-9', ben, 20, 19, 0, 5, 'done'),
+      item('APP-20', ben, 12, 12, 0, 3, 'done'),
+      item('APP-21', chen, 12, 17, 0, 2, 'done'),
+      item('APP-22', dana, 16, 10, 6, 3),
+    ],
     101: [item('APP-1', asha, 30, 32, 0, 5, 'done'), item('APP-2', ben, 40, 38, 0, 8, 'done'), item('APP-3', chen, 20, 22, 0, 3, 'done')],
     102: [
       item('APP-10', asha, 24, 10, 14, 5),

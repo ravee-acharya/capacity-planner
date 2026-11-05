@@ -9,7 +9,7 @@ interface Row {
   accountId: string;
   displayName: string;
   avatarUrl?: string;
-  memberships: { template: string; unit: Unit; role?: string; perDay: number; focus: number }[];
+  memberships: { template: string; unit: Unit; role?: string; perDay: number; focus: number; allocation: number; location?: string }[];
 }
 
 /** Directory of everyone in any template, with their roles, capacity and upcoming leave. */
@@ -24,7 +24,7 @@ export function TeamMembers() {
     for (const t of templates.data ?? []) {
       for (const m of t.members) {
         const r = map.get(m.accountId) ?? { accountId: m.accountId, displayName: m.displayName, avatarUrl: m.avatarUrl, memberships: [] };
-        r.memberships.push({ template: t.name, unit: t.unit, role: m.role, perDay: m.capacityPerDay ?? t.defaultCapacityPerDay, focus: m.focus ?? t.defaultFocus });
+        r.memberships.push({ template: t.name, unit: t.unit, role: m.role, perDay: m.capacityPerDay ?? t.defaultCapacityPerDay, focus: m.focus ?? t.defaultFocus, allocation: m.allocation ?? 100, location: m.location });
         map.set(m.accountId, r);
       }
     }
@@ -67,6 +67,8 @@ export function TeamMembers() {
                 <th>Role</th>
                 <th className="num">Capacity / day</th>
                 <th className="num">Focus</th>
+                <th className="num">Allocation</th>
+                <th>Location</th>
                 <th className="num">Effective / day</th>
                 <th>Upcoming leave</th>
               </tr>
@@ -85,7 +87,9 @@ export function TeamMembers() {
                     <td>{m.role || <span className="muted">—</span>}</td>
                     <td className="num">{formatValue(m.perDay, m.unit)}</td>
                     <td className="num">{m.focus}</td>
-                    <td className="num">{formatValue(m.perDay * m.focus, m.unit)}</td>
+                    <td className="num">{m.allocation}%</td>
+                    <td className="small">{m.location ?? <span className="muted">—</span>}</td>
+                    <td className="num">{formatValue((m.perDay * m.focus * m.allocation) / 100, m.unit)}</td>
                     {i === 0 && (
                       <td rowSpan={r.memberships.length} className="small">
                         {upcoming.length === 0 ? <span className="muted">None</span> : upcoming.map((l) => <div key={l.id}>{`${formatDate(l.from)} – ${formatDate(l.to)}`}</div>)}

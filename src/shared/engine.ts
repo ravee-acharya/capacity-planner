@@ -13,7 +13,7 @@
  * In addition, "balance" = total capacity - allocated work (negative = over-allocated).
  */
 import { eachDate, weekday } from './dates';
-import type { DateStr, Settings, TemplateConfig, TemplateMember, Unit, WorkItem } from './types';
+import type { DateStr, Holiday, Settings, TemplateConfig, TemplateMember, Unit, WorkItem } from './types';
 
 export type DayKind = 'working' | 'nonworking' | 'holiday' | 'leave';
 
@@ -34,9 +34,14 @@ export interface MemberCapacity {
   inTemplate: boolean;
   capacityPerDay: number;
   focus: number;
+  /** Percentage of this person allocated to the team (0..100). */
+  allocation: number;
+  location?: string;
   days: DayCapacity[];
   availableDays: number;
   totalCapacity: number;
+  /** Capacity before the focus factor (capacity/day × allocation). Used to measure real focus from history. */
+  rawCapacity: number;
   remainingCapacity: number;
   allocated: number;
   timeSpent: number;
@@ -90,6 +95,8 @@ export interface CapacityInput {
   today: DateStr;
   config: TemplateConfig;
   holidays: Iterable<DateStr>;
+  /** location -> holidays that apply only to members with that location */
+  locationHolidays?: Record<string, Iterable<DateStr>>;
   /** accountId -> dates on leave */
   leaves: Record<string, Iterable<DateStr>>;
   overrides?: Record<string, Record<DateStr, number>>;
@@ -137,7 +144,26 @@ export function percent(numerator: number, denominator: number): number | null {
 export function effectivePerDay(member: TemplateMember, config: TemplateConfig) {
   const capacityPerDay = safeNumber(member.capacityPerDay ?? config.defaultCapacityPerDay);
   const focus = Math.min(1, safeNumber(member.focus ?? config.defaultFocus, 1));
-  return { capacityPerDay, focus, perDay: capacityPerDay * focus };
+  const allocation = Math.min(100, safeNumber(member.allocation ?? 100, 100));
+  const share = allocation / 100;
+  return { capacityPerDay, focus, allocation, rawPerDay: capacityPerDay * share, perDay: capacityPerDay * focus * share };
+}
+
+/** Split stored holidays into the engine's company-wide list and per-location map. */
+export function holidayInputs(stored: Pick<Holiday, 'date' | 'location'>[], teamHolidays: DateStr[] = []) {
+  const holidays: DateStr[] = [...teamHolidays];
+  const locationHolidays: Record<string, DateStr[]> = {};
+  for (const h of stored) {
+    const key = locationKey(h.location);
+    if (key) (locationHolidays[key] ??= []).push(h.date);
+    else holidays.push(h.date);
+  }
+  return { holidays, locationHolidays };
+}
+
+/** Normalise a location label so "india " and "India" match. */
+export function locationKey(location: string | undefined | null): string {
+  return (location ?? '').trim().toLowerCase();
 }
 
 /** Per-day capacity for one member. Precedence: non-working > holiday > leave > override > default. */
@@ -240,15 +266,29 @@ export function calculateCapacity(input: CapacityInput): CapacityResult {
     byAssignee.set(item.assigneeId, list);
   }
 
+  // Location-specific holidays, keyed by normalised location; merged with company-wide ones per member.
+  const byLocation = new Map<string, Set<DateStr>>();
+  for (const [loc, list] of Object.entries(input.locationHolidays ?? {})) {
+    const key = locationKey(loc);
+    if (!key) continue;
+    const set = byLocation.get(key) ?? new Set(holidays);
+    for (const h of list) if (!start || !end || (h >= start && h <= end)) set.add(h);
+    byLocation.set(key, set);
+  }
+
   const unitMismatch = config.unit !== unit;
   const members: MemberCapacity[] = [];
   const build = (member: TemplateMember, inTemplate: boolean) => {
-    const eff = inTemplate && !unitMismatch ? effectivePerDay(member, config) : { capacityPerDay: 0, focus: 1, perDay: 0 };
+    const eff = inTemplate && !unitMismatch ? effectivePerDay(member, config) : { capacityPerDay: 0, focus: 1, allocation: 0, rawPerDay: 0, perDay: 0 };
     const leave = new Set<DateStr>(input.leaves[member.accountId] ?? []);
-    const days = memberDays(dates, config.workingDays, holidays, leave, eff.perDay, input.overrides?.[member.accountId]);
+    const memberHolidays = byLocation.get(locationKey(member.location)) ?? holidays;
+    const overrides = input.overrides?.[member.accountId];
+    const days = memberDays(dates, config.workingDays, memberHolidays, leave, eff.perDay, overrides);
     // Rounded to remove float drift (8 * 0.8 summed ten times is 63.999…), which would
     // otherwise flag exactly-full people as overloaded.
     const totalCapacity = round(days.reduce((s, d) => s + d.capacity, 0), 6);
+    // Overridden days are explicit plans, so they count as-is; other working days use the no-focus rate.
+    const rawCapacity = round(days.reduce((s, d) => s + (d.kind !== 'working' ? 0 : d.overridden ? d.capacity : eff.rawPerDay), 0), 6);
     const remainingCapacity = round(days.filter((d) => d.date >= today).reduce((s, d) => s + d.capacity, 0), 6);
     const elapsedCapacity = totalCapacity - remainingCapacity;
     const items = byAssignee.get(member.accountId) ?? [];
@@ -277,9 +317,12 @@ export function calculateCapacity(input: CapacityInput): CapacityResult {
       inTemplate,
       capacityPerDay: eff.capacityPerDay,
       focus: eff.focus,
+      allocation: eff.allocation,
+      location: member.location?.trim() || undefined,
       days,
       availableDays: days.filter((d) => d.kind === 'working' && d.capacity > 0).length,
       totalCapacity,
+      rawCapacity,
       remainingCapacity,
       allocated,
       timeSpent,
