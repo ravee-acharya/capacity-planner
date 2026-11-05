@@ -1,7 +1,7 @@
 // Every resolver the frontend can invoke. Pure business logic over the Ctx ports, so the
 // same code runs in Forge, in unit tests and in the local demo.
 import { otherCommitments, type OtherCommitment } from '../shared/commitments';
-import { eachDate, expandRanges, isDateStr, toDateStr, weekStart } from '../shared/dates';
+import { addDays, eachDate, expandRanges, isDateStr, toDateStr, weekStart } from '../shared/dates';
 import { allocatedOf, calculateCapacity, DEFAULT_SETTINGS, holidayInputs, isCounted, locationKey, round } from '../shared/engine';
 import { calibrateMember, velocityForecast, type HistorySprint, type MemberCalibration, type MemberSample, type VelocityForecast } from '../shared/forecast';
 import { compactReport, type Report, type ReportParams, type SavedReport, type SavedReportSummary, type SprintReport, type WeeklySpent } from '../shared/report';
@@ -34,6 +34,10 @@ const K = {
 };
 
 const MAX_REPORT_ROWS = 6;
+/** Days after a sprint's planned end that still count as finished in that sprint. */
+const SPRINT_CLOSE_GRACE_DAYS = 3;
+/** A sprint completing more than 2× its capacity is treated as bad data, not velocity. */
+const MAX_PLAUSIBLE_RATE = 2;
 /** Per past sprint; keeps a 6-sprint forecast well inside the resolver time limit. */
 const MAX_FORECAST_WORKLOG_ISSUES = 60;
 const MAX_SNAPSHOT_CHARS = 200_000;
@@ -296,16 +300,22 @@ export function createApi(ctx: Ctx) {
           items,
           settings,
         });
-        const finishedBy = s.completeDate ?? s.endDate!;
+        // Delivery = finished *during* the sprint: from its start to its planned end (plus a few
+        // days' grace for late closing). Sprints are sometimes closed months late, and issues
+        // already finished before the start are often carried in; neither is this sprint's output.
+        const finishedBy = addDays(s.endDate!, SPRINT_CLOSE_GRACE_DAYS);
         const sum = (list: WorkItem[]) => list.reduce((acc, it) => acc + (allocatedOf(it, unit) ?? 0), 0);
-        const isDone = (it: WorkItem) => it.statusCategory === 'done' && (!it.doneDate || it.doneDate <= finishedBy);
-        const allCounted = items.filter((it) => isCounted(it, s.startDate, settings));
+        const doneBeforeStart = (it: WorkItem) => it.statusCategory === 'done' && !!it.doneDate && it.doneDate < s.startDate!;
+        const isDone = (it: WorkItem) => it.statusCategory === 'done' && (!it.doneDate || (it.doneDate >= s.startDate! && it.doneDate <= finishedBy));
+        const allCounted = items.filter((it) => isCounted(it, s.startDate, settings) && !doneBeforeStart(it));
         // Only the template's people: capacity is theirs, so work done by others (people who
         // left, other teams, unassigned) would inflate the completion rate.
         const counted = allCounted.filter((it) => it.assigneeId && memberIds.has(it.assigneeId));
         const done = counted.filter(isDone);
         excludedDone += sum(allCounted.filter(isDone)) - sum(done);
         const capacity = result.totals.totalCapacity;
+        const rate = capacity > 0 ? sum(done) / capacity : null;
+        const outlier = rate !== null && rate > MAX_PLAUSIBLE_RATE;
         history.push({
           id: s.id,
           name: s.name,
@@ -314,7 +324,8 @@ export function createApi(ctx: Ctx) {
           capacity,
           completed: sum(done),
           committed: sum(counted),
-          rate: capacity > 0 ? sum(done) / capacity : null,
+          rate: outlier ? null : rate,
+          note: outlier ? `Excluded: ${Math.round(rate! * 100)}% of capacity is not plausible (bulk-closed issues or inflated estimates?)` : undefined,
         });
         for (const m of result.members) {
           if (!memberIds.has(m.accountId)) continue;

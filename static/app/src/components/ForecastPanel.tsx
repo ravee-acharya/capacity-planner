@@ -127,7 +127,9 @@ export function ForecastPanel({
                     <th>Past sprint</th>
                     <th className="num">Capacity</th>
                     <th className="num">Committed</th>
-                    <th className="num">Completed</th>
+                    <th className="num" title="Finished between the sprint's start and its planned end (+3 days)">
+                      Completed in sprint
+                    </th>
                     <th className="num">Of capacity</th>
                   </tr>
                 </thead>
@@ -137,11 +139,12 @@ export function ForecastPanel({
                       <td>
                         {h.name}
                         <div className="small muted">{formatDate(h.end)}</div>
+                        {h.note && <div className="small" style={{ color: 'var(--warning-text)' }}>{h.note}</div>}
                       </td>
                       <td className="num">{f(h.capacity)}</td>
                       <td className="num">{f(h.committed)}</td>
                       <td className="num">{f(h.completed)}</td>
-                      <td className="num">{formatPercent(h.rate === null ? null : h.rate * 100)}</td>
+                      <td className="num">{h.note ? <span className="lozenge warning">excluded</span> : formatPercent(h.rate === null ? null : h.rate * 100)}</td>
                     </tr>
                   ))}
                   {data.history.length === 0 && (

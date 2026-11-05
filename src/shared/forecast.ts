@@ -23,8 +23,10 @@ export interface HistorySprint {
   completed: number;
   /** Work that was in the sprint, completed or not. */
   committed: number;
-  /** completed / capacity, or null when the sprint had no capacity. */
+  /** completed / capacity, or null when the sprint had no capacity or was excluded. */
   rate: number | null;
+  /** Why the sprint was excluded from the velocity range, if it was. */
+  note?: string;
 }
 
 export type Verdict = 'comfortable' | 'likely' | 'stretch' | 'unlikely';

@@ -173,6 +173,36 @@ describe('forecast service (fixture history)', () => {
     expect(f.warnings.join(' ')).toMatch(/3 of 3 past sprints had no saved plan/);
   });
 
+  it('counts only work finished during each sprint and drops implausible sprints', async () => {
+    const base = fixtureJira(TODAY);
+    const jira: typeof base = {
+      ...base,
+      sprintIssues: async (id, sp) => {
+        const items = await base.sprintIssues(id, sp);
+        if (id === 99) {
+          // Sprint 10 runs 2026-09-21..2026-10-02.
+          items.find((i) => i.key === 'APP-30')!.doneDate = '2026-09-10'; // finished before it started
+          items.find((i) => i.key === 'APP-31')!.doneDate = '2026-10-20'; // closed long after it ended
+        }
+        if (id === 100) {
+          const big = structuredClone(items[0]);
+          items.push({ ...big, key: 'APP-99', originalEstimateSec: 500 * 3600, doneDate: undefined });
+        }
+        return items;
+      },
+    };
+    let n = 0;
+    const api = createApi({ accountId: 'u-asha', jira, store: memoryStore(), now: () => new Date(`${TODAY}T10:00:00Z`), newId: () => `id${++n}` });
+    const t = await api.createTemplate(template);
+    const f = await api.getForecast({ boardId: 1, sprintId: 102, templateId: t.id });
+    const [s10, s11, s12] = f.history;
+    expect([s10.committed, s10.completed]).toEqual([78, 48]); // APP-30 not committed or completed; APP-31 not completed
+    expect(s11.rate).toBeNull();
+    expect(s11.note).toMatch(/Excluded: 318% of capacity/);
+    expect(s12.rate).toBe(0.5);
+    expect(f.velocity?.sprints).toBe(2);
+  });
+
   it('counts only past work done by the template’s people', async () => {
     const api = setup();
     const t = await api.createTemplate({ ...template, config: { ...template.config, members: [template.config.members[0]] } });
