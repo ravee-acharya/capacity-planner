@@ -49,7 +49,12 @@ export function Tracking() {
     }
   };
 
-  useEffect(() => setDraft(ws.data?.plan ? structuredClone(ws.data.plan) : null), [ws.data]);
+  useEffect(() => {
+    setDraft(ws.data?.plan ? structuredClone(ws.data.plan) : null);
+    // The re-apply dropdown must show this plan's template, not whichever was picked last elsewhere,
+    // or "Re-apply" would silently switch the sprint to a different template.
+    if (ws.data?.plan && ws.data.plan.templateId !== sel.templateId) select({ templateId: ws.data.plan.templateId });
+  }, [ws.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(ws.data?.plan ?? null), [draft, ws.data]);
 
