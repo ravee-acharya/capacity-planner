@@ -25,6 +25,18 @@
 - Status: Overloaded > overload threshold (default 100%), Under-utilised < under threshold (default 70%), "No work" when nothing is allocated, "No capacity" when capacity is 0. Values are rounded to 6 dp before comparison so float drift (e.g. 8 × 0.8 × 10) doesn't flag exactly-full people.
 - Sprint work assigned to people outside the template appears as a zero-capacity "Not in template" row; unassigned work is reported separately.
 
+## Forecasting enhancements (2026-11-05)
+
+- **Allocation %** per template member (blank = 100%). Daily capacity = capacity/day × focus × allocation.
+- **Over-commitment**: plans record their dates when applied/saved; Capacity tracking lists anyone whose allocation here plus in other overlapping sprint plans exceeds 100%. Plans saved before this change are included once they are re-saved.
+- **Location holidays**: a holiday can name a location; it then only removes capacity for members with that location (case-insensitive). Holidays without a location still apply to everyone.
+- **Forecast from past sprints** (Capacity tracking → Analyse history; last 4/6/8 closed sprints of the board):
+  - Each past sprint's capacity comes from its own saved plan, otherwise today's template (a notice says how many used the fallback).
+  - *Completion rate* = estimates (or points) of issues done by sprint end ÷ team capacity. Forecast = rate × this sprint's capacity. Range = min–max with 2–4 sprints, P20–P80 with 5+; fewer than 2 usable sprints → no forecast. Verdict compares the commitment (allocated + unassigned) to the range.
+  - *Measured focus* = hours logged on the person's sprint issues ÷ hours available before focus, over sprints where they logged time (2+ needed). Hours templates only. Issue time spent can include time logged outside the sprint; it's an approximation.
+  - *Estimate accuracy* = time spent ÷ original estimate on the person's finished issues (5+ needed). "Likely actual effort" = allocated × that ratio.
+  - Suggestions never change anything on their own: "Use" updates the draft plan, which must then be saved.
+
 ## Feature inventory and acceptance criteria
 
 | Area | Acceptance criteria | Status |
