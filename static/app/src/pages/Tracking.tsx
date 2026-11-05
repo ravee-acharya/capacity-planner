@@ -7,7 +7,7 @@ import { call } from '../bridge';
 import { overCommitted } from '../../../../src/shared/commitments';
 import { ForecastPanel } from '../components/ForecastPanel';
 import { SprintPicker, TemplateSelect } from '../components/pickers';
-import { Empty, ErrorMessage, Field, Message, Meter, Spinner, Stat, StatusLozenge, UnitBadge, Who } from '../components/ui';
+import { Confirm, Empty, ErrorMessage, Field, Message, Meter, Spinner, Stat, StatusLozenge, UnitBadge, Who } from '../components/ui';
 import { formatDate, useApp, useAsync } from '../hooks';
 import { WorkingDays } from './Templates';
 
@@ -31,6 +31,23 @@ export function Tracking() {
   const [onlyConflicts, setOnlyConflicts] = useState(false);
   const [sort, setSort] = useState<SortKey>('name');
   const [newHoliday, setNewHoliday] = useState('');
+  const [removing, setRemoving] = useState(false);
+
+  const removePlan = async () => {
+    if (!sel.sprintId) return;
+    setRemoving(false);
+    setBusy(true);
+    setError(undefined);
+    try {
+      await call('deletePlan', { sprintId: sel.sprintId });
+      toast('Capacity plan removed from this sprint');
+      ws.reload();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => setDraft(ws.data?.plan ? structuredClone(ws.data.plan) : null), [ws.data]);
 
@@ -167,6 +184,9 @@ export function Tracking() {
         {draft && (
           <div className="row">
             {dirty && <span className="lozenge warning">Unsaved changes</span>}
+            <button className="btn subtle" disabled={busy} onClick={() => setRemoving(true)}>
+              Remove plan
+            </button>
             <button className="btn" disabled={!dirty || busy} onClick={() => setDraft(ws.data?.plan ? structuredClone(ws.data.plan) : null)}>
               Discard
             </button>
@@ -527,6 +547,11 @@ export function Tracking() {
             </>
           )}
         </>
+      )}
+      {removing && (
+        <Confirm title={`Remove the capacity plan for ${sprint?.name ?? 'this sprint'}?`} confirmLabel="Remove plan" onCancel={() => setRemoving(false)} onConfirm={removePlan}>
+          Day adjustments and sprint holidays for this sprint are deleted. The template itself is not affected, and Jira issues are never changed.
+        </Confirm>
       )}
     </div>
   );

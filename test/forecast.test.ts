@@ -173,6 +173,23 @@ describe('forecast service (fixture history)', () => {
     expect(f.warnings.join(' ')).toMatch(/3 of 3 past sprints had no saved plan/);
   });
 
+  it('measures focus from worklogs inside the sprint, not lifetime issue time spent', async () => {
+    // Jira only returns worklogs started within the requested dates; simulate half the time
+    // having been logged before the sprint started.
+    const jira = fixtureJira(TODAY);
+    const inSprint: typeof jira.worklogs = async (keys, from, to) => {
+      const all = await fixtureJira(TODAY).worklogs(keys, from, to);
+      return { ...all, entries: all.entries.filter((e) => e.started !== from) };
+    };
+    let n = 0;
+    const api = createApi({ accountId: 'u-asha', jira: { ...jira, worklogs: inSprint }, store: memoryStore(), now: () => new Date(`${TODAY}T10:00:00Z`), newId: () => `id${++n}` });
+    const t = await api.createTemplate(template);
+    const f = await api.getForecast({ boardId: 1, sprintId: 102, templateId: t.id });
+    const asha = f.members.find((m) => m.accountId === 'u-asha')!;
+    expect(asha.measuredFocus).toBeCloseTo(0.22, 2); // ~53.5h of 240h, not 107h
+    expect(asha.estimateBias).toBe(1.22); // bias still uses each finished issue's total time
+  });
+
   it('records plan dates and reports overlapping commitments in the workspace', async () => {
     const api = setup();
     const t = await api.createTemplate(template);

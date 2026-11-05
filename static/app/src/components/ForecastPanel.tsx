@@ -218,7 +218,7 @@ export function ForecastPanel({
             </table>
           </div>
           <p className="small muted" style={{ margin: 0 }}>
-            Measured focus = hours logged on the person's sprint issues ÷ hours they were available (before focus), over sprints where they logged time. Estimate accuracy = time spent ÷ original estimate on finished issues.
+            Measured focus = hours the person logged on sprint issues during the sprint ÷ hours they were available (before focus), over sprints where they logged time. Estimate accuracy = time spent ÷ original estimate on finished issues.
             Suggestions only change this sprint's plan after you click Use and then Save plan.
           </p>
         </>

@@ -34,6 +34,8 @@ const K = {
 };
 
 const MAX_REPORT_ROWS = 6;
+/** Per past sprint; keeps a 6-sprint forecast well inside the resolver time limit. */
+const MAX_FORECAST_WORKLOG_ISSUES = 60;
 const MAX_SNAPSHOT_CHARS = 200_000;
 
 export interface Preferences {
@@ -259,14 +261,26 @@ export function createApi(ctx: Ctx) {
     const samples = new Map<string, MemberSample[]>();
     const history: HistorySprint[] = [];
     let usedFallbackConfig = 0;
+    let truncatedWorklogs = 0;
 
     // Three sprints at a time keeps well inside the resolver time limit.
     for (let i = 0; i < past.length; i += 3) {
       const batch = past.slice(i, i + 3);
       const loaded = await Promise.all(
-        batch.map(async (s) => ({ s, items: await ctx.jira.sprintIssues(s.id, spField), own: await ctx.store.get<SprintPlan>(K.plan(s.id)) })),
+        batch.map(async (s) => {
+          const items = await ctx.jira.sprintIssues(s.id, spField);
+          // Hours logged *during the sprint* by each person. Issue "time spent" can't be used:
+          // it includes everything ever logged on the issue, often across many sprints.
+          const logged = unit === 'hours' ? items.filter((it) => (it.timeSpentSec ?? 0) > 0).map((it) => it.key) : [];
+          const keys = logged.slice(0, MAX_FORECAST_WORKLOG_ISSUES);
+          const wl = keys.length ? await ctx.jira.worklogs(keys, s.startDate!, s.endDate!) : { entries: [], truncated: false };
+          const byAuthor = new Map<string, number>();
+          for (const e of wl.entries) byAuthor.set(e.authorId, (byAuthor.get(e.authorId) ?? 0) + e.timeSpentSec / 3600);
+          if (wl.truncated || logged.length > keys.length) truncatedWorklogs += 1;
+          return { s, items, byAuthor, own: await ctx.store.get<SprintPlan>(K.plan(s.id)) };
+        }),
       );
-      for (const { s, items, own } of loaded) {
+      for (const { s, items, byAuthor, own } of loaded) {
         const histConfig: TemplateConfig = own && own.config.unit === unit ? own.config : config;
         if (histConfig === config) usedFallbackConfig += 1;
         const result = calculateCapacity({
@@ -302,7 +316,7 @@ export function createApi(ctx: Ctx) {
           const list = samples.get(m.accountId) ?? [];
           list.push({
             rawCapacityHours: unit === 'hours' ? m.rawCapacity : 0,
-            spentHours: m.timeSpent,
+            spentHours: byAuthor.get(m.accountId) ?? 0,
             estimatedSec: mine.reduce((acc, it) => acc + (it.originalEstimateSec ?? 0), 0),
             spentOnEstimatedSec: mine.reduce((acc, it) => acc + (it.timeSpentSec ?? 0), 0),
             estimatedIssues: mine.length,
@@ -315,6 +329,9 @@ export function createApi(ctx: Ctx) {
       warnings.push(`${usedFallbackConfig} of ${past.length} past sprints had no saved plan, so today's template was used for their capacity.`);
     }
     if (unit === 'points') warnings.push('Measured focus needs hour-based capacity, so it is only shown for hours templates.');
+    if (truncatedWorklogs > 0) {
+      warnings.push(`${truncatedWorklogs} past sprint(s) had more than ${MAX_FORECAST_WORKLOG_ISSUES} issues with logged time; measured focus uses the first ${MAX_FORECAST_WORKLOG_ISSUES} and may be understated.`);
+    }
 
     // This sprint, as planned now.
     const items = await ctx.jira.sprintIssues(sprintId, spField);
