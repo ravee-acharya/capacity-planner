@@ -173,6 +173,14 @@ describe('forecast service (fixture history)', () => {
     expect(f.warnings.join(' ')).toMatch(/3 of 3 past sprints had no saved plan/);
   });
 
+  it('counts only past work done by the template’s people', async () => {
+    const api = setup();
+    const t = await api.createTemplate({ ...template, config: { ...template.config, members: [template.config.members[0]] } });
+    const f = await api.getForecast({ boardId: 1, sprintId: 102, templateId: t.id });
+    expect(f.history.map((h) => h.completed)).toEqual([30, 28, 30]); // Asha's finished estimates only
+    expect(f.warnings.join(' ')).toMatch(/152h of estimates completed in past sprints by people outside this template/);
+  });
+
   it('measures focus from worklogs inside the sprint, not lifetime issue time spent', async () => {
     // Jira only returns worklogs started within the requested dates; simulate half the time
     // having been logged before the sprint started.

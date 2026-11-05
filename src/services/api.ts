@@ -2,7 +2,7 @@
 // same code runs in Forge, in unit tests and in the local demo.
 import { otherCommitments, type OtherCommitment } from '../shared/commitments';
 import { eachDate, expandRanges, isDateStr, toDateStr, weekStart } from '../shared/dates';
-import { allocatedOf, calculateCapacity, DEFAULT_SETTINGS, holidayInputs, isCounted, locationKey } from '../shared/engine';
+import { allocatedOf, calculateCapacity, DEFAULT_SETTINGS, holidayInputs, isCounted, locationKey, round } from '../shared/engine';
 import { calibrateMember, velocityForecast, type HistorySprint, type MemberCalibration, type MemberSample, type VelocityForecast } from '../shared/forecast';
 import { compactReport, type Report, type ReportParams, type SavedReport, type SavedReportSummary, type SprintReport, type WeeklySpent } from '../shared/report';
 import type { DateStr, Holiday, Leave, Settings, SprintInfo, SprintPlan, Template, TemplateConfig, Unit, WorkItem } from '../shared/types';
@@ -262,6 +262,7 @@ export function createApi(ctx: Ctx) {
     const history: HistorySprint[] = [];
     let usedFallbackConfig = 0;
     let truncatedWorklogs = 0;
+    let excludedDone = 0;
 
     // Three sprints at a time keeps well inside the resolver time limit.
     for (let i = 0; i < past.length; i += 3) {
@@ -296,9 +297,14 @@ export function createApi(ctx: Ctx) {
           settings,
         });
         const finishedBy = s.completeDate ?? s.endDate!;
-        const counted = items.filter((it) => isCounted(it, s.startDate, settings));
-        const done = counted.filter((it) => it.statusCategory === 'done' && (!it.doneDate || it.doneDate <= finishedBy));
         const sum = (list: WorkItem[]) => list.reduce((acc, it) => acc + (allocatedOf(it, unit) ?? 0), 0);
+        const isDone = (it: WorkItem) => it.statusCategory === 'done' && (!it.doneDate || it.doneDate <= finishedBy);
+        const allCounted = items.filter((it) => isCounted(it, s.startDate, settings));
+        // Only the template's people: capacity is theirs, so work done by others (people who
+        // left, other teams, unassigned) would inflate the completion rate.
+        const counted = allCounted.filter((it) => it.assigneeId && memberIds.has(it.assigneeId));
+        const done = counted.filter(isDone);
+        excludedDone += sum(allCounted.filter(isDone)) - sum(done);
         const capacity = result.totals.totalCapacity;
         history.push({
           id: s.id,
@@ -329,6 +335,10 @@ export function createApi(ctx: Ctx) {
       warnings.push(`${usedFallbackConfig} of ${past.length} past sprints had no saved plan, so today's template was used for their capacity.`);
     }
     if (unit === 'points') warnings.push('Measured focus needs hour-based capacity, so it is only shown for hours templates.');
+    if (excludedDone > 0) {
+      const amount = unit === 'hours' ? `${Math.round(excludedDone)}h of estimates` : `${round(excludedDone, 1)} points`;
+      warnings.push(`${amount} completed in past sprints by people outside this template (or unassigned) is not counted, so the forecast reflects this team only.`);
+    }
     if (truncatedWorklogs > 0) {
       warnings.push(`${truncatedWorklogs} past sprint(s) had more than ${MAX_FORECAST_WORKLOG_ISSUES} issues with logged time; measured focus uses the first ${MAX_FORECAST_WORKLOG_ISSUES} and may be understated.`);
     }
