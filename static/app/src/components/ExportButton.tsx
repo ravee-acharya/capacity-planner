@@ -3,10 +3,7 @@ import { reportToCsv, type Report } from '../../../../src/shared/report';
 import { downloadText, fileSafe, useApp } from '../hooks';
 import { Modal } from './ui';
 
-/**
- * Exports the report as CSV. Jira's app frame can block downloads silently (the app cannot
- * detect it), so the CSV is always shown too, ready to copy.
- */
+/** Downloads the report as CSV; "Copy CSV" shows the text for pasting straight into a spreadsheet. */
 export function ExportButton({ report, name }: { report: Report; name: string }) {
   const { toast } = useApp();
   const [csv, setCsv] = useState<string>();
@@ -17,37 +14,35 @@ export function ExportButton({ report, name }: { report: Report; name: string })
         className="btn"
         onClick={() => {
           const text = reportToCsv(report);
-          downloadText(file, text);
-          setCsv(text);
+          if (downloadText(file, text)) toast(`Downloaded ${file}`);
+          else setCsv(text);
         }}
       >
         Export CSV
       </button>
+      <button className="btn subtle" onClick={() => setCsv(reportToCsv(report))} title="Show the CSV to copy into a spreadsheet">
+        Copy CSV
+      </button>
       {csv !== undefined && (
         <Modal
-          title="Export CSV"
+          title="Copy CSV"
           onClose={() => setCsv(undefined)}
           footer={
-            <>
-              <button className="btn subtle" onClick={() => downloadText(file, csv)}>
-                Try download again
-              </button>
-              <button
-                className="btn primary"
-                onClick={() =>
-                  navigator.clipboard.writeText(csv).then(
-                    () => toast('CSV copied – paste it into Excel or Google Sheets'),
-                    () => toast('Select the text and copy it manually', 'error'),
-                  )
-                }
-              >
-                Copy to clipboard
-              </button>
-            </>
+            <button
+              className="btn primary"
+              onClick={() =>
+                navigator.clipboard.writeText(csv).then(
+                  () => toast('CSV copied – paste it into Excel or Google Sheets'),
+                  () => toast('Select the text and press Ctrl+C to copy', 'error'),
+                )
+              }
+            >
+              Copy to clipboard
+            </button>
           }
         >
           <p className="muted" style={{ margin: 0 }}>
-            If <strong>{file}</strong> didn't download (Jira can block downloads from apps), copy the CSV below and paste it into Excel or Google Sheets.
+            Paste this into Excel or Google Sheets. If the copy button doesn't work, click in the box, press Ctrl+A, then Ctrl+C.
           </p>
           <textarea className="input" readOnly rows={12} value={csv} onFocus={(e) => e.currentTarget.select()} style={{ fontFamily: 'monospace', fontSize: 12 }} />
         </Modal>
