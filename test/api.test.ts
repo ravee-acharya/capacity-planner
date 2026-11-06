@@ -119,6 +119,49 @@ describe('reports', () => {
     expect(s.weekly?.byMember['u-asha']['2026-11-02'].spent).toBe(8);
   });
 
+  it('shows only template members who belong to the sprint’s project', async () => {
+    let n = 0;
+    const api = createApi({
+      accountId: 'u-asha',
+      jira: fixtureJira(TODAY, undefined, true, ['u-zara']),
+      store: memoryStore(),
+      now: () => new Date(`${TODAY}T10:00:00Z`),
+      newId: () => `id${++n}`,
+    });
+    const tpl = template();
+    tpl.config.members.push({ accountId: 'u-zara', displayName: 'Zara Other-Project', capacityPerDay: null, focus: null });
+    const t = await api.createTemplate(tpl);
+
+    const report = await api.computeReport({ unit: 'hours', rows: [{ boardId: 1, sprintId: 102, templateId: t.id }] });
+    const ids = report.sprints[0].result.members.map((m) => m.accountId);
+    expect(ids).not.toContain('u-zara');
+    expect(ids).toContain('u-asha');
+    expect(report.sprints[0].result.warnings.join(' ')).toMatch(/1 template member\(s\) are not part of APP in Jira and are not shown: Zara Other-Project/);
+
+    await api.applyTemplate({ boardId: 1, sprintId: 102, templateId: t.id });
+    const ws = await api.getWorkspace({ boardId: 1, sprintId: 102 });
+    expect(ws.projectKey).toBe('APP');
+    expect(ws.hiddenMembers).toEqual([{ accountId: 'u-zara', displayName: 'Zara Other-Project' }]);
+
+    const f = await api.getForecast({ boardId: 1, sprintId: 102 });
+    expect(f.members.map((m) => m.accountId)).not.toContain('u-zara');
+  });
+
+  it('keeps everyone if Jira project membership cannot be checked', async () => {
+    const base = fixtureJira(TODAY);
+    let n = 0;
+    const api = createApi({
+      accountId: 'u-asha',
+      jira: { ...base, projectMembers: async () => Promise.reject(new Error('403')) },
+      store: memoryStore(),
+      now: () => new Date(`${TODAY}T10:00:00Z`),
+      newId: () => `id${++n}`,
+    });
+    const t = await api.createTemplate(template());
+    const report = await api.computeReport({ unit: 'hours', rows: [{ boardId: 1, sprintId: 102, templateId: t.id }] });
+    expect(report.sprints[0].result.members.filter((m) => m.inTemplate)).toHaveLength(3);
+  });
+
   it('refuses to report a plan in a different unit', async () => {
     const { api } = setup();
     const t = await api.createTemplate(template());

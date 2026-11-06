@@ -63,12 +63,13 @@ export function Tracking() {
     const { sprint, items, holidays, leaves, settings } = ws.data;
     const byMember: Record<string, string[]> = {};
     for (const l of leaves) byMember[l.accountId] = [...(byMember[l.accountId] ?? []), ...expandRanges([l])];
+    const outside = new Set(ws.data.hiddenMembers.map((m) => m.accountId));
     return calculateCapacity({
       unit: draft.config.unit,
       start: sprint.startDate ?? draft.periodStart,
       end: sprint.endDate ?? draft.periodEnd,
       today: app.today,
-      config: draft.config,
+      config: { ...draft.config, members: draft.config.members.filter((m) => !outside.has(m.accountId)) },
       ...holidayInputs(holidays, draft.teamHolidays),
       leaves: byMember,
       overrides: draft.overrides,
@@ -339,6 +340,11 @@ export function Tracking() {
                   {w}
                 </Message>
               ))}
+              {ws.data.hiddenMembers.length > 0 && (
+                <Message>
+                  Not shown – not part of {ws.data.projectKey ?? 'this project'} in Jira: {ws.data.hiddenMembers.map((m) => m.displayName).join(', ')}. They stay in the template for other projects.
+                </Message>
+              )}
               {overCommits.length > 0 && (
                 <Message tone="error" title="Some people are committed to more than 100% across teams">
                   <ul>

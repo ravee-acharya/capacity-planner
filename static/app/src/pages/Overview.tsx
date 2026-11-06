@@ -12,7 +12,10 @@ export function Overview() {
   const { app, navigate, selection: sel, select } = useApp();
   const templateId = sel.templateId;
   const templates = useAsync(() => call('listTemplates'), []);
-  const ws = useAsync(() => (sel.boardId && sel.sprintId ? call('getWorkspace', { boardId: sel.boardId, sprintId: sel.sprintId }) : Promise.resolve(undefined)), [sel.boardId, sel.sprintId]);
+  const ws = useAsync(
+    () => (sel.boardId && sel.sprintId ? call('getWorkspace', { boardId: sel.boardId, sprintId: sel.sprintId, templateId: sel.templateId }) : Promise.resolve(undefined)),
+    [sel.boardId, sel.sprintId, sel.templateId],
+  );
   const timeOff = useAsync(() => call('upcomingTimeOff', { days: 30 }), []);
   const [loadedAt, setLoadedAt] = useState<Date>();
   useEffect(() => {
@@ -31,7 +34,7 @@ export function Overview() {
       start: ws.data.sprint.startDate ?? plan?.periodStart,
       end: ws.data.sprint.endDate ?? plan?.periodEnd,
       today: app.today,
-      config,
+      config: { ...config, members: config.members.filter((m) => !ws.data!.hiddenMembers.some((h) => h.accountId === m.accountId)) },
       ...holidayInputs(ws.data.holidays, plan?.teamHolidays),
       leaves,
       overrides: plan?.overrides,
@@ -95,6 +98,11 @@ export function Overview() {
             {loadedAt && <span>· Jira data loaded {formatDateTime(loadedAt.toISOString())}</span>}
           </div>
           {!plan && <Message tone="warning">This sprint has no saved plan, so sprint-specific holidays and day adjustments are not included.</Message>}
+          {ws.data.hiddenMembers.length > 0 && (
+            <Message>
+              Not shown – not part of {ws.data.projectKey ?? 'this project'} in Jira: {ws.data.hiddenMembers.map((m) => m.displayName).join(', ')}.
+            </Message>
+          )}
           {result.warnings.map((w) => (
             <Message key={w} tone="warning">
               {w}

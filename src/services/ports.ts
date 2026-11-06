@@ -43,6 +43,10 @@ export interface JiraClient {
   /** Worklogs logged within [from, to] on the given issues. `truncated` = not every issue was read. */
   worklogs(issueKeys: string[], from: string, to: string): Promise<{ entries: WorklogEntry[]; truncated: boolean }>;
   searchUsers(query: string, projectKey?: string): Promise<JiraUser[]>;
+  /** Key of the project a board belongs to, if Jira reports one. */
+  boardProject(boardId: number): Promise<string | undefined>;
+  /** Which of the given accounts can be assigned issues in the project (Jira's notion of a project member). */
+  projectMembers(projectKey: string, accountIds: string[]): Promise<Set<string>>;
   issueTypes(): Promise<string[]>;
 }
 

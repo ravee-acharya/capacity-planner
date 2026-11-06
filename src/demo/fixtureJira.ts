@@ -31,7 +31,8 @@ function item(key: string, assignee: JiraUser | null, est: number | null, spent:
 }
 
 /** Builds fixture data with sprint dates relative to `today` so demo screens always look current. */
-export function fixtureJira(today: string, me: JiraUser = DEMO_USERS[0], admin = true): JiraClient {
+/** `outsiders`: accounts that are NOT members of the APP project. */
+export function fixtureJira(today: string, me: JiraUser = DEMO_USERS[0], admin = true, outsiders: string[] = []): JiraClient {
   const [asha, ben, chen, dana, eli] = DEMO_USERS;
   const monday = weekStart(today);
   const sprints: SprintInfo[] = [
@@ -99,5 +100,7 @@ export function fixtureJira(today: string, me: JiraUser = DEMO_USERS[0], admin =
     },
     searchUsers: async (q) => DEMO_USERS.filter((u) => u.displayName.toLowerCase().includes(q.toLowerCase())),
     issueTypes: async () => ['Bug', 'Story', 'Sub-task', 'Task'],
+    boardProject: async (boardId) => (boardId === 1 ? 'APP' : undefined),
+    projectMembers: async (_key, ids) => new Set(ids.filter((id) => !outsiders.includes(id))),
   };
 }

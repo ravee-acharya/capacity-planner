@@ -185,6 +185,21 @@ export const forgeJiraClient: JiraClient = {
       .map((u): JiraUser => ({ accountId: u.accountId, displayName: u.displayName, avatarUrl: avatar(u.avatarUrls) }));
   },
 
+  async boardProject(boardId) {
+    const b = await get<{ location?: { projectKey?: string } }>(route`/rest/agile/1.0/board/${boardId}`);
+    return b.location?.projectKey;
+  },
+
+  async projectMembers(projectKey, accountIds) {
+    const ids = [...new Set(accountIds)];
+    const found = await mapLimit(ids, 5, async (accountId) => {
+      const params = new URLSearchParams({ project: projectKey, accountId, maxResults: '1' });
+      const users = await get<{ accountId: string }[]>(route`/rest/api/3/user/assignable/search?${params}`);
+      return users.some((u) => u.accountId === accountId) ? accountId : null;
+    });
+    return new Set(found.filter((x): x is string => x !== null));
+  },
+
   async issueTypes() {
     const types = await get<{ name: string }[]>(route`/rest/api/3/issuetype`);
     return [...new Set(types.map((t) => t.name))].sort();

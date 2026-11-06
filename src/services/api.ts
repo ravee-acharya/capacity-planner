@@ -5,7 +5,7 @@ import { addDays, eachDate, expandRanges, isDateStr, toDateStr, weekStart } from
 import { allocatedOf, calculateCapacity, DEFAULT_SETTINGS, holidayInputs, isCounted, locationKey, round } from '../shared/engine';
 import { calibrateMember, velocityForecast, type HistorySprint, type MemberCalibration, type MemberSample, type VelocityForecast } from '../shared/forecast';
 import { compactReport, type Report, type ReportParams, type SavedReport, type SavedReportSummary, type SprintReport, type WeeklySpent } from '../shared/report';
-import type { DateStr, Holiday, Leave, Settings, SprintInfo, SprintPlan, Template, TemplateConfig, Unit, WorkItem } from '../shared/types';
+import type { DateStr, Holiday, Leave, Settings, SprintInfo, SprintPlan, Template, TemplateConfig, TemplateMember, Unit, WorkItem } from '../shared/types';
 import { normaliseWorkingDays, validateDateRange, validateSettings, validateTemplateInput, ValidationError } from '../shared/validation';
 import type { Ctx } from './ports';
 
@@ -34,6 +34,7 @@ const K = {
 };
 
 const MAX_REPORT_ROWS = 6;
+const DEFAULT_CONFIG: TemplateConfig = { unit: 'hours', defaultCapacityPerDay: 8, defaultFocus: 1, workingDays: [1, 2, 3, 4, 5], members: [] };
 /** Days after a sprint's planned end that still count as finished in that sprint. */
 const SPRINT_CLOSE_GRACE_DAYS = 3;
 /** A sprint completing more than 2× its capacity is treated as bad data, not velocity. */
@@ -60,6 +61,10 @@ export interface Workspace {
   templateVersion?: number;
   /** Other sprint plans overlapping this sprint, per person (for over-commitment warnings). */
   commitments: Record<string, OtherCommitment[]>;
+  /** Project the sprint's board belongs to. */
+  projectKey?: string;
+  /** Template members (of the plan, or of `templateId` when there is no plan) who are not in the project. */
+  hiddenMembers: { accountId: string; displayName: string }[];
 }
 
 export interface ForecastMember extends MemberCalibration {
@@ -137,6 +142,37 @@ export function createApi(ctx: Ctx) {
     if (problems.length) throw new ValidationError(problems);
   }
 
+  /**
+   * Limit a template's people to members of the sprint's Jira project (people who can be assigned
+   * issues there). A template can be reused across projects, but a project's report should only
+   * show that project's people. If Jira can't be asked, everyone is kept.
+   */
+  const membershipCache = new Map<string, Promise<Set<string>>>();
+  async function scopeToProject(boardId: number, config: TemplateConfig, projectHint?: string) {
+    const projectKey = (await ctx.jira.boardProject(boardId).catch(() => undefined)) ?? projectHint;
+    if (!projectKey || config.members.length === 0) return { config, hidden: [] as TemplateMember[], projectKey };
+    const ids = config.members.map((m) => m.accountId);
+    const cacheKey = `${projectKey}|${[...ids].sort().join(',')}`;
+    let lookup = membershipCache.get(cacheKey);
+    if (!lookup) {
+      lookup = ctx.jira.projectMembers(projectKey, ids);
+      membershipCache.set(cacheKey, lookup);
+    }
+    const members = await lookup.catch(() => undefined);
+    if (!members) return { config, hidden: [] as TemplateMember[], projectKey };
+    return {
+      config: { ...config, members: config.members.filter((m) => members.has(m.accountId)) },
+      hidden: config.members.filter((m) => !members.has(m.accountId)),
+      projectKey,
+    };
+  }
+
+  function hiddenNotice(hidden: TemplateMember[], projectKey?: string) {
+    const names = hidden.map((m) => m.displayName);
+    const list = names.length > 5 ? `${names.slice(0, 5).join(', ')} and ${names.length - 5} more` : names.join(', ');
+    return `${hidden.length} template member(s) are not part of ${projectKey ?? 'this project'} in Jira and are not shown: ${list}.`;
+  }
+
   async function storyPointsField(boardId: number, settings: Settings) {
     if (settings.storyPointsFieldId) return settings.storyPointsFieldId;
     return ctx.jira.boardEstimationField(boardId).catch(() => undefined);
@@ -169,7 +205,7 @@ export function createApi(ctx: Ctx) {
     return { weeks, byMember, truncated };
   }
 
-  async function sprintReport(row: { boardId: number; sprintId: number; templateId?: string }, unit: ReportParams['unit'], settings: Settings, holidays: Holiday[], leaves: Record<string, DateStr[]>): Promise<SprintReport> {
+  async function sprintReport(row: { boardId: number; sprintId: number; templateId?: string; projectKey?: string }, unit: ReportParams['unit'], settings: Settings, holidays: Holiday[], leaves: Record<string, DateStr[]>): Promise<SprintReport> {
     const [sprint, plan] = await Promise.all([ctx.jira.sprint(row.sprintId), ctx.store.get<SprintPlan>(K.plan(row.sprintId))]);
     const usePlan = plan && (!row.templateId || row.templateId === plan.templateId);
     let config: TemplateConfig;
@@ -190,19 +226,20 @@ export function createApi(ctx: Ctx) {
     }
     const spField = unit === 'points' ? await storyPointsField(row.boardId, settings) : undefined;
     if (unit === 'points' && !spField) throw new ValidationError([`${sprint.name}: no story point field is configured for this board.`]);
-    const items = await ctx.jira.sprintIssues(row.sprintId, spField);
+    const [items, scope] = await Promise.all([ctx.jira.sprintIssues(row.sprintId, spField), scopeToProject(row.boardId, config, row.projectKey)]);
     const result = calculateCapacity({
       unit,
       start: usePlan ? (sprint.startDate ?? plan.periodStart) : sprint.startDate,
       end: usePlan ? (sprint.endDate ?? plan.periodEnd) : sprint.endDate,
       today: today(),
-      config,
+      config: scope.config,
       ...holidayInputs(holidays, usePlan ? plan.teamHolidays : []),
       leaves,
       overrides: usePlan ? plan.overrides : undefined,
       items,
       settings,
     });
+    if (scope.hidden.length) result.warnings.push(hiddenNotice(scope.hidden, scope.projectKey));
     return { sprint, boardId: row.boardId, templateName, source: usePlan ? 'plan' : 'template', result, weekly: await weekly(result, items) };
   }
 
@@ -249,8 +286,10 @@ export function createApi(ctx: Ctx) {
       leavesByMember(),
       storyPointsField(boardId, settings),
     ]);
-    const config: TemplateConfig | undefined = plan?.config ?? (p.templateId ? await getTemplate(p.templateId) : undefined);
-    if (!config) throw new ValidationError(['Apply a template to this sprint (or choose one) before forecasting.']);
+    const chosen: TemplateConfig | undefined = plan?.config ?? (p.templateId ? await getTemplate(p.templateId) : undefined);
+    if (!chosen) throw new ValidationError(['Apply a template to this sprint (or choose one) before forecasting.']);
+    const scope = await scopeToProject(boardId, chosen);
+    const config = scope.config;
     const unit = config.unit;
     const warnings: string[] = [];
     if (unit === 'points' && !spField) throw new ValidationError(['No story point field is configured for this board.']);
@@ -261,6 +300,7 @@ export function createApi(ctx: Ctx) {
       .slice(0, want);
     if (past.length === 0) warnings.push('This board has no closed sprints with dates yet, so there is no history to learn from.');
 
+    if (scope.hidden.length) warnings.push(hiddenNotice(scope.hidden, scope.projectKey));
     const memberIds = new Set(config.members.map((m) => m.accountId));
     const samples = new Map<string, MemberSample[]>();
     const history: HistorySprint[] = [];
@@ -286,8 +326,9 @@ export function createApi(ctx: Ctx) {
         }),
       );
       for (const { s, items, byAuthor, own } of loaded) {
-        const histConfig: TemplateConfig = own && own.config.unit === unit ? own.config : config;
-        if (histConfig === config) usedFallbackConfig += 1;
+        const ownUsable = own && own.config.unit === unit;
+        const histConfig: TemplateConfig = ownUsable ? (await scopeToProject(boardId, own.config)).config : config;
+        if (!ownUsable) usedFallbackConfig += 1;
         const result = calculateCapacity({
           unit,
           start: s.startDate,
@@ -502,7 +543,7 @@ export function createApi(ctx: Ctx) {
     },
 
     // ---- Sprint plans (capacity tracking) ----
-    async getWorkspace(p: { boardId: number; sprintId: number }): Promise<Workspace> {
+    async getWorkspace(p: { boardId: number; sprintId: number; templateId?: string }): Promise<Workspace> {
       const settings = await getSettings();
       const [sprint, plan, holidays, leaves, spField] = await Promise.all([
         ctx.jira.sprint(Number(p.sprintId)),
@@ -517,7 +558,23 @@ export function createApi(ctx: Ctx) {
         ctx.store.list<SprintPlan>('plan:'),
       ]);
       const commitments = otherCommitments(plans, { sprintId: sprint.id, start: sprint.startDate ?? plan?.periodStart, end: sprint.endDate ?? plan?.periodEnd });
-      return { sprint, plan: plan ?? null, items, holidays, leaves, settings, storyPointsField: spField, templateVersion: tpl?.version, commitments };
+      // Members of the plan, plus the chosen template (Overview estimates from a template when there is no plan).
+      const extra = !plan && p.templateId ? await ctx.store.get<Template>(K.template(p.templateId)) : undefined;
+      const people = [...(plan?.config.members ?? []), ...(extra?.members ?? [])];
+      const scope = await scopeToProject(Number(p.boardId), { ...(plan?.config ?? extra ?? DEFAULT_CONFIG), members: people });
+      return {
+        sprint,
+        plan: plan ?? null,
+        items,
+        holidays,
+        leaves,
+        settings,
+        storyPointsField: spField,
+        templateVersion: tpl?.version,
+        commitments,
+        projectKey: scope.projectKey,
+        hiddenMembers: scope.hidden.map((m) => ({ accountId: m.accountId, displayName: m.displayName })),
+      };
     },
 
     async applyTemplate(p: { boardId: number; sprintId: number; templateId: string }) {
