@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capacity Planner for Jira — User guide | TheTechFreaks</title>
+<meta name="description" content="How to use Capacity Planner for Jira and Capacity Planner Pro: templates, capacity tracking, holidays and leave, forecasts and reports.">
+<style>
+:root{color-scheme:light;--ink:#172b4d;--muted:#44546f;--blue:#0c66e4;--line:#dfe1e6;--bg:#f7f8fa;--card:#fff}
+*{box-sizing:border-box}body{margin:0;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:linear-gradient(120deg,#0747a6,#0c66e4);color:#fff;padding:48px 22px}
+.wrap{max-width:920px;margin:auto;padding:0 22px}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.78rem;font-weight:700;opacity:.85}
+h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:.45rem 0}
+header p{max-width:680px;font-size:1.1rem;margin:12px 0 0}
+main{padding:28px 0 56px}
+nav,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:0 0 18px}
+nav h2,.card h2{margin-top:0}
+nav ul{display:flex;flex-wrap:wrap;gap:10px 22px;padding-left:20px;margin-bottom:0}
+a{color:var(--blue)}h2{font-size:1.45rem;margin-bottom:8px}h3{font-size:1.05rem;margin-bottom:4px}
+.note{border-left:4px solid var(--blue);padding:12px 16px;background:#e9f2ff;border-radius:4px}
+img{max-width:100%;border:1px solid var(--line);border-radius:8px}
+footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">TheTechFreaks · Capacity Planner for Jira</div>
+    <h1>User guide</h1>
+    <p>Plan sprint capacity per person and forecast what your team will really deliver.</p>
+  </div>
+</header>
+<main class="wrap">
+
+  <nav aria-label="On this page">
+    <h2>On this page</h2>
+    <ul>
+      <li><a href="#start">Getting started</a></li>
+      <li><a href="#templates">Templates</a></li>
+      <li><a href="#tracking">Capacity tracking</a></li>
+      <li><a href="#holidays">Holidays &amp; leave</a></li>
+      <li><a href="#forecast">Forecast</a></li>
+      <li><a href="#reports">Reports</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#support">Support</a></li>
+    </ul>
+  </nav>
+
+  <section class="card" id="start">
+    <h2>Getting started</h2>
+    <p>Open Jira and choose <strong>Apps → Capacity Planner</strong>. The app reads Jira with your own permissions, so you only see the projects, sprints and people you can already see in Jira. It never changes your issues.</p>
+    <ol>
+      <li>Create a <a href="#templates">capacity template</a> for your team.</li>
+      <li>In <a href="#tracking">Capacity tracking</a>, choose a project, board and sprint, and apply the template.</li>
+      <li>Add holidays or leave, adjust individual days, and save the plan.</li>
+    </ol>
+  </section>
+
+  <section class="card" id="templates">
+    <h2>Templates</h2>
+    <p>A template lists the team and how much each person can take on:</p>
+    <ul>
+      <li><strong>Capacity per day</strong> — hours (or story points) a person works per day.</li>
+      <li><strong>Focus</strong> — the share of the day spent on sprint work (0–1), e.g. 0.8 for meetings and support.</li>
+      <li><strong>Allocation %</strong> — the share of the person's time given to this team. If someone works for two teams in the same fortnight, their allocations should add up to 100%.</li>
+      <li><strong>Location</strong> — which location-specific holidays apply (for example India or USA).</li>
+      <li><strong>Role</strong> — used for role reports.</li>
+    </ul>
+    <p>Applying a template to a sprint copies it into that sprint's plan, so later template edits never change past plans. Use <em>Re-apply</em> to pick up changes.</p>
+  </section>
+
+  <section class="card" id="tracking">
+    <h2>Capacity tracking</h2>
+    <p>The planning grid shows each person's capacity per day for the sprint. Weekends, holidays and leave are shaded; type a different number in any day to plan reduced or extra capacity, and clear it to go back to the default.</p>
+    <p>The summary shows total, allocated and remaining capacity, the balance and utilisation, and highlights people who are <strong>overloaded</strong> or <strong>under-utilised</strong>. Allocated work is the original estimate (or story points) of the sprint issues assigned to each person.</p>
+    <p class="note">If someone's allocations across overlapping sprints add up to more than 100%, a warning names them so their time is not counted twice.</p>
+    <img src="https://raw.githubusercontent.com/ravee-acharya/capacity-planner/main/marketing/2-capacity-tracking.png" alt="Capacity tracking grid">
+  </section>
+
+  <section class="card" id="holidays">
+    <h2>Holidays &amp; leave</h2>
+    <p>Add company holidays for everyone, or holidays for one location only. Add leave for a person with a date range. These apply automatically to every sprint plan, and each day is removed from capacity only once.</p>
+  </section>
+
+  <section class="card" id="forecast">
+    <h2>Forecast</h2>
+    <p>In Capacity tracking, choose <strong>Analyse history</strong> to learn from the board's recently closed sprints:</p>
+    <ul>
+      <li><strong>Delivery range</strong> — how much work the team typically finishes per unit of capacity, applied to this sprint's capacity, with a verdict on the current commitment (comfortable, likely, stretch, unlikely).</li>
+      <li><strong>Measured focus</strong> — hours each person logged on sprint issues during the sprint, compared with the hours they were available. Click <em>Use</em> to apply it to the plan, then save.</li>
+      <li><strong>Estimate accuracy</strong> — time spent compared with original estimates on finished issues, and the likely actual effort of this sprint's work.</li>
+    </ul>
+    <p>Only work finished during each sprint, by people in the template, is counted. Suggestions need a few sprints of history.</p>
+    <img src="https://raw.githubusercontent.com/ravee-acharya/capacity-planner/main/marketing/3-forecast.png" alt="Forecast panel">
+  </section>
+
+  <section class="card" id="reports">
+    <h2>Reports</h2>
+    <p>Compare up to six sprints by team, sprint, team member, role and resource utilisation (time logged against capacity, week by week). Choose <strong>Hours</strong> or <strong>Story points</strong> to match the sprint plans. Save a report as private or public, and export it to CSV.</p>
+    <img src="https://raw.githubusercontent.com/ravee-acharya/capacity-planner/main/marketing/4-reports.png" alt="Team report">
+  </section>
+
+  <section class="card" id="settings">
+    <h2>Settings</h2>
+    <p>Jira administrators can choose which issue types count, how remaining work is calculated, the overload and under-utilisation thresholds, the story point field, and whether only administrators may change templates.</p>
+  </section>
+
+  <section class="card" id="support">
+    <h2>Support</h2>
+    <p>Email <a href="mailto:support@sportscentral.biz">support@sportscentral.biz</a>. See also the <a href="privacy-policy.html">privacy policy</a>.</p>
+  </section>
+
+</main>
+<footer>
+  <div class="wrap">TheTechFreaks · Capacity Planner for Jira</div>
+</footer>
+</body>
+</html>
