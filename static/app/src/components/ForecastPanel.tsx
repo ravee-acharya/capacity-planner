@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Forecast } from '../../../../src/services/api';
 import { formatPercent, formatValue } from '../../../../src/shared/engine';
 import { MIN_BIAS_ISSUES, MIN_FOCUS_SPRINTS, VERDICT_TEXT, type Verdict } from '../../../../src/shared/forecast';
-import { call } from '../bridge';
+import { call, DEMO } from '../bridge';
 import { formatDate } from '../hooks';
 import { ErrorMessage, Message, Spinner, Who } from './ui';
 
@@ -58,6 +58,11 @@ export function ForecastPanel({
       setLoading(false);
     }
   };
+
+  // Demo only: ?demo&autorun runs the analysis on load (used for Marketplace screenshots).
+  useEffect(() => {
+    if (DEMO && new URLSearchParams(location.search).has('autorun')) void run();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unit = data?.unit ?? 'hours';
   const f = (v: number | null) => formatValue(v, unit);

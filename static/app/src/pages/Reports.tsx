@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Report, ReportParams, ReportRow } from '../../../../src/shared/report';
 import type { Unit } from '../../../../src/shared/types';
-import { call } from '../bridge';
+import { call, DEMO } from '../bridge';
 import { ExportButton } from '../components/ExportButton';
 import { SprintPicker, TemplateSelect } from '../components/pickers';
 import { ReportView } from '../components/ReportView';
@@ -36,6 +36,11 @@ export function Reports() {
       setRunning(false);
     }
   };
+
+  // Demo only: ?demo&autorun runs the report on load (used for Marketplace screenshots).
+  useEffect(() => {
+    if (DEMO && new URLSearchParams(location.search).has('autorun') && ready.length) void run();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!saving || !report) return;

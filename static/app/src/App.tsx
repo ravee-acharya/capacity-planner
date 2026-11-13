@@ -24,7 +24,8 @@ const NAV: [Section, string, string][] = [
 
 export function App() {
   const ctx = useAsync(() => call('getContext'), []);
-  const [section, setSection] = useState<Section>('overview');
+  // Demo only: ?demo&section=tracking opens a given section (used for Marketplace screenshots).
+  const [section, setSection] = useState<Section>(() => (DEMO ? ((new URLSearchParams(location.search).get('section') as Section) ?? 'overview') : 'overview'));
   const [navState, setNavState] = useState<unknown>();
   const [toasts, setToasts] = useState<{ id: number; message: string; tone: string }[]>([]);
 
@@ -78,7 +79,7 @@ export function App() {
 
   return (
     <Ctx.Provider value={value}>
-      {DEMO && <div className="demo-banner">DEMO MODE — sample data only, nothing is saved to Jira</div>}
+      {DEMO && !new URLSearchParams(location.search).has('shots') && <div className="demo-banner">DEMO MODE — sample data only, nothing is saved to Jira</div>}
       <div className="app">
         <nav className="sidebar" aria-label="Capacity Planner">
           <div className="brand">
