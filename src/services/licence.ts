@@ -1,17 +1,17 @@
 // Licence gate for the paid edition (Paid via Atlassian).
 //
-// Jira only includes `license` in the invocation context for apps whose manifest enables
-// licensing, so the free edition never has one and is never blocked. For the paid edition the
-// app is blocked only when Jira explicitly reports the licence as inactive (trial ended,
-// subscription cancelled). No licence object - e.g. before the Marketplace listing goes live,
-// or in development - means the app is allowed.
+// Per Atlassian's Forge licensing docs, `context.license` is only present for paid apps in the
+// production environment; it is undefined for free apps, unlisted apps and non-production
+// environments. When present, `license.active` is true only for a valid licence.
+// So: no licence object -> allowed (free edition, development); licence object that is not
+// active (trial ended, subscription cancelled) -> blocked.
 
 export interface LicenceInfo {
-  isActive?: boolean;
+  active?: boolean;
 }
 
 export function isLicenceBlocked(license: LicenceInfo | null | undefined): boolean {
-  return !!license && typeof license === 'object' && license.isActive === false;
+  return !!license && typeof license === 'object' && license.active !== true;
 }
 
 export const LICENCE_MESSAGE =
