@@ -79,15 +79,18 @@ jobs:
         if: steps.ready.outputs.ok == 'true'
         run: |
           set +e
-          forge install --upgrade --site "$SITE" --product jira -e production --non-interactive --confirm-scopes 2>&1 | tee install.log
+          forge install --upgrade --site "$SITE" --product jira -e production --non-interactive --confirm-scopes 2>&1 | tee upgrade.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             forge install --site "$SITE" --product jira -e production --non-interactive --confirm-scopes 2>&1 | tee install.log
             status=${PIPESTATUS[0]}
           fi
           if [ "$status" -ne 0 ]; then
-            grep -v '^\s*$' install.log | tail -n 15 | while IFS= read -r line; do
-              echo "::error title=forge install::${line//%/%25}"
+            # Error lines first (the tail of the output is just the list of scopes being confirmed).
+            for f in upgrade.log install.log; do
+              grep -iE 'error|denied|cannot|can.t|not allowed|licen|marketplace|fail' "$f" | head -n 10 | while IFS= read -r line; do
+                echo "::error title=forge install ($f)::${line//%/%25}"
+              done
             done
           fi
           exit "$status"
