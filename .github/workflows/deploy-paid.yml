@@ -54,7 +54,8 @@ jobs:
         if: steps.ready.outputs.ok == 'true'
         run: |
           set +e
-          forge lint 2>&1 | tee lint.log
+          # Name the environment: a new app has no default one and the CLI can't prompt in CI.
+          forge lint -e production 2>&1 | tee lint.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             grep -v '^\s*$' lint.log | tail -n 20 | while IFS= read -r line; do
