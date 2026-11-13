@@ -3,9 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { forgeJiraClient } from './forge/jiraClient';
 import { forgeStore } from './forge/store';
 import { createApi, ForbiddenError, NotFoundError, type ApiName } from './services/api';
+import { isLicenceBlocked, LICENCE_MESSAGE, type LicenceInfo } from './services/licence';
 import { ValidationError } from './shared/validation';
 
-export type ResolverResult<T = unknown> = { ok: true; data: T } | { ok: false; kind: 'validation' | 'forbidden' | 'notfound' | 'error'; error: string; problems?: string[] };
+export type ResolverResult<T = unknown> =
+  | { ok: true; data: T }
+  | { ok: false; kind: 'validation' | 'forbidden' | 'notfound' | 'unlicensed' | 'error'; error: string; problems?: string[] };
 
 export function toFailure(e: unknown): ResolverResult<never> {
   if (e instanceof ValidationError) return { ok: false, kind: 'validation', error: e.message, problems: e.problems };
@@ -22,6 +25,7 @@ for (const name of names) {
   resolver.define(name, async ({ payload, context }) => {
     const accountId = context.accountId as string | undefined;
     if (!accountId) return { ok: false, kind: 'forbidden', error: 'Sign in to Jira to use Capacity Planner.' };
+    if (isLicenceBlocked((context as { license?: LicenceInfo }).license)) return { ok: false, kind: 'unlicensed', error: LICENCE_MESSAGE };
     const api = createApi({ accountId, jira: forgeJiraClient, store: forgeStore, now: () => new Date(), newId: randomUUID });
     try {
       const fn = api[name] as (p: unknown) => Promise<unknown>;

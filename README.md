@@ -34,6 +34,19 @@ One-time setup in GitHub → Settings → Secrets and variables → Actions (or 
 
 The app must be installed on the site once (below). Later deploys update it in place; run `forge install --upgrade` only after changing scopes in `manifest.yml`.
 
+## Free and paid editions
+
+One codebase, two Forge apps:
+
+| | Free – Capacity Planner | Paid – Capacity Planner Pro |
+|---|---|---|
+| Manifest | `manifest.yml` | generated from it by `scripts/make-paid-manifest.mjs` (own app id, title, `licensing.enabled`) |
+| App id | in `manifest.yml` | in `editions/paid.json` |
+| Pipeline | `deploy.yml` – every push to `main` → development | `deploy-paid.yml` – run manually or push a `v*` tag → **production** |
+| Licence | none | blocked only when Jira reports the licence inactive (`src/services/licence.ts`) |
+
+First-time setup for the paid app: `forge register "Capacity Planner Pro"` in a scratch folder, put the printed app id (`ari:cloud:ecosystem::app/…`) in `editions/paid.json`, commit, then run the "Deploy paid edition" workflow. Charging customers requires listing the app on the Atlassian Marketplace as *Paid via Atlassian*; until then Jira sends no licence and the app runs unrestricted.
+
 ## Deploy manually (development environment)
 
 ```bash

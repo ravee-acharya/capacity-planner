@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { call, DEMO } from './bridge';
-import { ErrorMessage, Spinner } from './components/ui';
+import { ApiError, call, DEMO } from './bridge';
+import { Empty, ErrorMessage, Spinner } from './components/ui';
 import { Ctx, useAsync, type Section, type Selection } from './hooks';
 import { Holidays } from './pages/Holidays';
 import { Overview } from './pages/Overview';
@@ -60,6 +60,15 @@ export function App() {
 
   if (!value && !ctx.error) return <Spinner label="Loading Capacity Planner" />;
   if (!value) {
+    if ((ctx.error as ApiError | undefined)?.kind === 'unlicensed') {
+      return (
+        <div className="main">
+          <div className="card">
+            <Empty title="Subscription needed">{(ctx.error as ApiError).message}</Empty>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="main">
         <ErrorMessage error={ctx.error} />

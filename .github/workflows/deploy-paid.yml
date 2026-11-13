@@ -1,0 +1,83 @@
+name: Deploy paid edition (production)
+
+# Capacity Planner Pro: the same code as the free app, deployed as a separate Forge app with
+# licensing enabled. Runs on demand or when a version tag (v1.2.3) is pushed, so production only
+# changes deliberately.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: forge-deploy-paid-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-paid:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+      SITE: ${{ vars.FORGE_PAID_SITE || vars.FORGE_SITE || 'dashtech.atlassian.net' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck, test and build
+        run: npm run check
+      - name: Check credentials and paid app id
+        id: ready
+        run: |
+          ok=true
+          if [ -z "$FORGE_EMAIL" ] || [ -z "$FORGE_API_TOKEN" ]; then
+            echo "::warning::FORGE_EMAIL / FORGE_API_TOKEN secrets are not set; skipping."
+            ok=false
+          fi
+          if ! node -e "const e=require('./editions/paid.json'); process.exit(/^ari:cloud:ecosystem::app\/[0-9a-f-]{36}$/.test(e.appId||'')?0:1)"; then
+            echo "::warning::editions/paid.json has no appId yet. Register the paid app with 'forge register' and commit its id; skipping."
+            ok=false
+          fi
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+      - name: Switch manifest to the paid edition
+        if: steps.ready.outputs.ok == 'true'
+        run: node scripts/make-paid-manifest.mjs
+      - name: Install Forge CLI
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          npm install -g @forge/cli@15
+          forge settings set usage-analytics false
+      - name: Lint manifest
+        if: steps.ready.outputs.ok == 'true'
+        run: forge lint
+      - name: Deploy to production
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          set +e
+          forge deploy -e production --non-interactive 2>&1 | tee deploy.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -v '^\s*$' deploy.log | tail -n 15 | while IFS= read -r line; do
+              echo "::error title=forge deploy::${line//%/%25}"
+            done
+          fi
+          exit "$status"
+      - name: Install or upgrade on the Jira site
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          set +e
+          forge install --upgrade --site "$SITE" --product jira -e production --non-interactive --confirm-scopes 2>&1 | tee install.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            forge install --site "$SITE" --product jira -e production --non-interactive --confirm-scopes 2>&1 | tee install.log
+            status=${PIPESTATUS[0]}
+          fi
+          if [ "$status" -ne 0 ]; then
+            grep -v '^\s*$' install.log | tail -n 15 | while IFS= read -r line; do
+              echo "::error title=forge install::${line//%/%25}"
+            done
+          fi
+          exit "$status"
