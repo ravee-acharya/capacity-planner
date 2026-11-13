@@ -1,9 +1,11 @@
+import api, { privacy, route } from '@forge/api';
 import Resolver from '@forge/resolver';
 import { randomUUID } from 'node:crypto';
 import { forgeJiraClient } from './forge/jiraClient';
 import { forgeStore } from './forge/store';
 import { createApi, ForbiddenError, NotFoundError, type ApiName } from './services/api';
 import { isLicenceBlocked, LICENCE_MESSAGE, type LicenceInfo } from './services/licence';
+import { runPersonalDataReport } from './services/personalData';
 import { ValidationError } from './shared/validation';
 
 export type ResolverResult<T = unknown> =
@@ -37,3 +39,19 @@ for (const name of names) {
 }
 
 export const handler = resolver.getDefinitions();
+
+/** Weekly scheduled trigger: Atlassian personal data reporting for every stored account. */
+export async function privacyHandler() {
+  const result = await runPersonalDataReport({
+    store: forgeStore,
+    report: (accounts) => privacy.reportPersonalData(accounts),
+    lookupUser: async (accountId) => {
+      const res = await api.asApp().requestJira(route`/rest/api/3/user?accountId=${accountId}`, { headers: { Accept: 'application/json' } });
+      if (!res.ok) return undefined;
+      const u = (await res.json()) as { displayName?: string; avatarUrls?: Record<string, string> };
+      return u.displayName ? { displayName: u.displayName, avatarUrl: u.avatarUrls?.['48x48'] } : undefined;
+    },
+    now: () => new Date(),
+  });
+  console.log(`Personal data report: ${result.reported} account(s) reported, ${result.closed} erased, ${result.updated} refreshed.`);
+}

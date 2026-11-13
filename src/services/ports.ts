@@ -8,6 +8,8 @@ export interface Store {
   delete(key: string): Promise<void>;
   /** All values whose key starts with the prefix. */
   list<T>(prefix: string): Promise<T[]>;
+  /** Like list, but with each value's key. */
+  entries<T>(prefix: string): Promise<[string, T][]>;
 }
 
 export interface JiraProject {

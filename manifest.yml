@@ -6,9 +6,15 @@ modules:
         function: resolver
       title: Capacity Planner
       icon: resource:main;icon.svg
+  scheduledTrigger:
+    - key: personal-data-report
+      function: privacy
+      interval: week
   function:
     - key: resolver
       handler: index.handler
+    - key: privacy
+      handler: index.privacyHandler
 resources:
   - key: main
     path: static/app/dist

@@ -147,6 +147,8 @@ th{font-weight:600;background:#fafbfc}
       <li><strong>Remove everything</strong> — uninstalling the app from your Jira site removes its Forge storage, including all templates, plans, holidays, leave, saved reports, settings and preferences, in line with Atlassian's data deletion process.</li>
     </ul>
     <p>If someone leaves your organisation, an app user can remove them from templates and delete their leave entries; their name and account ID will remain only in older sprint plans and saved reports until those are deleted.</p>
+    <h3>Closed Atlassian accounts</h3>
+    <p>Once a week the app uses Atlassian's personal data reporting to check every account ID it stores. When Atlassian reports that an account has been <strong>closed</strong>, the app erases it: the person is removed from templates and sprint plans, their leave entries and preferences are deleted, their private saved reports are deleted, and their name is replaced with "Former user" in shared saved reports. When Atlassian reports that a person's profile has <strong>changed</strong>, the app updates the copy of their display name it keeps.</p>
   </section>
 
   <section class="card" id="third-parties">

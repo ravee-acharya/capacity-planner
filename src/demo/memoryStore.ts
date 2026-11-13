@@ -17,6 +17,9 @@ export function memoryStore(seed: Record<string, unknown> = {}): Store & { dump(
     async list<T>(prefix: string) {
       return [...data.entries()].filter(([k]) => k.startsWith(prefix)).map(([, v]) => JSON.parse(v) as T);
     },
+    async entries<T>(prefix: string) {
+      return [...data.entries()].filter(([k]) => k.startsWith(prefix)).map(([k, v]): [string, T] => [k, JSON.parse(v) as T]);
+    },
     dump() {
       return Object.fromEntries([...data.entries()].map(([k, v]) => [k, JSON.parse(v)]));
     },
