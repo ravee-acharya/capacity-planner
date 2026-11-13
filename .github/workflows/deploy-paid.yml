@@ -19,7 +19,6 @@ jobs:
     env:
       FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
       FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
-      SITE: ${{ vars.FORGE_PAID_SITE || vars.FORGE_SITE || 'dashtech.atlassian.net' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

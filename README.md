@@ -42,10 +42,12 @@ One codebase, two Forge apps:
 |---|---|---|
 | Manifest | `manifest.yml` | generated from it by `scripts/make-paid-manifest.mjs` (own app id, title, `licensing.enabled`) |
 | App id | in `manifest.yml` | in `editions/paid.json` |
-| Pipeline | `deploy.yml` – every push to `main` → development | `deploy-paid.yml` – run manually or push a `v*` tag → **production** |
+| Pipeline | `deploy.yml` – every push to `main` → development, installed on the site | `deploy-paid.yml` – run manually or push a `v*` tag → **production** (deploy only: Atlassian does not allow licensed apps to be installed via the CLI; sites install Pro from its Marketplace listing) |
 | Licence | none | blocked only when Jira reports the licence inactive (`src/services/licence.ts`) |
 
 First-time setup for the paid app: `forge register "Capacity Planner Pro"` in a scratch folder, put the printed app id (`ari:cloud:ecosystem::app/…`) in `editions/paid.json`, commit, then run the "Deploy paid edition" workflow. Charging customers requires listing the app on the Atlassian Marketplace as *Paid via Atlassian*; until then Jira sends no licence and the app runs unrestricted.
+
+Privacy policy: `docs/privacy-policy.html`, published with GitHub Pages (Settings → Pages → Deploy from branch `main`, folder `/docs`) at `https://ravee-acharya.github.io/capacity-planner/privacy-policy.html`.
 
 ## Deploy manually (development environment)
 
