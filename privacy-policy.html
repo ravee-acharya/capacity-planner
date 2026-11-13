@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Capacity Planner for Jira | TheTechFreaks</title>
+<meta name="description" content="Privacy policy for Capacity Planner for Jira and Capacity Planner Pro by TheTechFreaks: what the app accesses, what it stores, who can see it, and where data is processed.">
+<style>
+:root{color-scheme:light;--ink:#172b4d;--muted:#44546f;--blue:#0c66e4;--line:#dfe1e6;--bg:#f7f8fa;--card:#fff}
+*{box-sizing:border-box}body{margin:0;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:linear-gradient(120deg,#0747a6,#0c66e4);color:#fff;padding:48px 22px}
+.wrap{max-width:920px;margin:auto;padding:0 22px}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.78rem;font-weight:700;opacity:.85}
+h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:.45rem 0}
+header p{max-width:680px;font-size:1.1rem;margin:12px 0 0}
+main{padding:28px 0 56px}
+nav,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:0 0 18px}
+nav h2,.card h2{margin-top:0}
+nav ul{display:flex;flex-wrap:wrap;gap:10px 22px;padding-left:20px;margin-bottom:0}
+a{color:var(--blue)}h2{font-size:1.45rem;margin-bottom:8px}h3{font-size:1.05rem;margin-bottom:4px}
+.note{border-left:4px solid var(--blue);padding:12px 16px;background:#e9f2ff;border-radius:4px}
+.warn{border-left:4px solid #b65c02;padding:12px 16px;background:#fff7d6;border-radius:4px}
+footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:.9rem}
+code{background:#f1f2f4;padding:2px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;background:#fafbfc}
+.tablewrap{overflow-x:auto}
+.draft{border-left:4px solid #bf2600;background:#ffeceb;padding:12px 16px;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">TheTechFreaks · Capacity Planner for Jira</div>
+    <h1>Privacy Policy</h1>
+    <p>What the app accesses, what it stores, who can see it, and where your data is processed.</p>
+  </div>
+</header>
+<main class="wrap">
+
+  <section class="card">
+    <p class="draft"><strong>Review before publishing.</strong> This describes the app's actual technical behaviour accurately, but it has not been reviewed by a lawyer, and the publisher name and contact details below still need confirming. Treat it as a draft for your legal review rather than finished legal advice.</p>
+  </section>
+
+  <nav aria-label="On this page">
+    <h2>On this page</h2>
+    <ul>
+      <li><a href="#scope">Scope</a></li>
+      <li><a href="#access">What the app accesses</a></li>
+      <li><a href="#stores">What the app stores</a></li>
+      <li><a href="#visibility">Who can see stored data</a></li>
+      <li><a href="#where">Where data is processed</a></li>
+      <li><a href="#logs">Diagnostic logs</a></li>
+      <li><a href="#exports">Exports</a></li>
+      <li><a href="#retention">Retention and deletion</a></li>
+      <li><a href="#third-parties">Third parties</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <section class="card" id="scope">
+    <h2>Scope</h2>
+    <p>This policy covers <strong>Capacity Planner for Jira</strong> and its paid edition <strong>Capacity Planner Pro</strong>, published by TheTechFreaks on the Atlassian Marketplace. Both editions are built from the same code and handle data identically; the only difference is that Capacity Planner Pro checks your site's subscription status (see <a href="#licence">Subscription status</a>). This policy does not cover Atlassian's own handling of your Jira data, which is governed by the <a href="https://www.atlassian.com/legal/privacy-policy">Atlassian Privacy Policy</a>.</p>
+    <p>The app is a <strong>Forge</strong> app and runs on Atlassian's infrastructure. It has no servers of its own.</p>
+    <p>Last updated: 13 November 2026.</p>
+  </section>
+
+  <section class="card" id="access">
+    <h2>What the app accesses</h2>
+    <p>The app requests the following permissions. All of them are read-only, except access to the app's own storage:</p>
+    <div class="tablewrap">
+    <table>
+      <tr><th>Permission</th><th>Why</th></tr>
+      <tr><td><code>read:jira-work</code>, <code>read:issue-details:jira</code>, <code>read:jql:jira</code></td><td>Read the issues in a sprint — summary, type, status, assignee, original and remaining estimates, time spent, story points and done date — and their worklogs (author, date and time logged), to calculate allocated work, remaining work and utilisation.</td></tr>
+      <tr><td><code>read:project:jira</code></td><td>List the projects you can see, so you can choose one.</td></tr>
+      <tr><td><code>read:board-scope:jira-software</code>, <code>read:board-scope.admin:jira-software</code>, <code>read:sprint:jira-software</code></td><td>List a project's boards and sprints with their dates, and read a board's estimation setting to find its story point field.</td></tr>
+      <tr><td><code>read:jira-user</code></td><td>Search for people when building a capacity template, show names and avatars, check whether a template member belongs to the sprint's project, and check whether you are a Jira administrator (only administrators can change the app's settings).</td></tr>
+      <tr><td><code>storage:app</code></td><td>Store the planning data described under <a href="#stores">What the app stores</a>.</td></tr>
+    </table>
+    </div>
+    <p class="note"><strong>The app reads Jira as you, not as itself.</strong> Every request is made with the signed-in user's own Jira permissions, so the app can never show a user projects, sprints, issues or people they could not already see in Jira. Installing the app grants it no visibility beyond that.</p>
+    <p>The app makes <strong>no changes</strong> to your Jira data. It does not create, edit or delete issues, worklogs, sprints or boards.</p>
+  </section>
+
+  <section class="card" id="stores">
+    <h2>What the app stores</h2>
+    <p>The app stores the planning information people enter into it, in Atlassian-hosted Forge storage for your Jira site:</p>
+    <div class="tablewrap">
+    <table>
+      <tr><th>Data</th><th>What it contains</th></tr>
+      <tr><td>Capacity templates</td><td>Template name and description; for each member: Atlassian account ID, display name, avatar address, role, capacity per day, focus, allocation percentage and location; default capacity and working days; the account IDs of who created and last changed the template, with timestamps.</td></tr>
+      <tr><td>Sprint capacity plans</td><td>For a sprint: a copy of the template it was planned with, the sprint name and dates, sprint-specific team holidays, and any per-person, per-day capacity adjustments; the account ID of who last changed it.</td></tr>
+      <tr><td>Holidays</td><td>Date, name and (optionally) the location it applies to.</td></tr>
+      <tr><td>Leave</td><td>A person's account ID and display name, the leave dates, and an optional free-text note.</td></tr>
+      <tr><td>Saved reports</td><td>Report name, description and visibility (private or public); the owner's account ID and display name; the sprints and templates the report covers; and a snapshot of the calculated figures per person (capacity, allocated work, time spent, utilisation, status) together with the keys of the issues counted.</td></tr>
+      <tr><td>Settings</td><td>Site-wide calculation rules chosen by a Jira administrator, such as which issue types count and utilisation thresholds.</td></tr>
+      <tr><td>Your last selection</td><td>The project, board, sprint and template you last used, keyed to your account ID, so the app reopens where you left off.</td></tr>
+    </table>
+    </div>
+    <p class="note"><strong>Jira issue data is not stored.</strong> Issues, estimates, worklogs and story points are fetched from Jira each time a page is opened or a report is run, used for the calculation, and discarded. The exception is a <em>saved report</em>, which deliberately keeps a snapshot of its calculated figures and issue keys so it can be compared later.</p>
+    <p class="warn"><strong>Leave notes are free text.</strong> Please don't enter sensitive personal information such as medical details. A note like "Annual leave" or "Conference" is enough.</p>
+  </section>
+
+  <section class="card" id="visibility">
+    <h2>Who can see stored data</h2>
+    <p>Capacity planning is a team activity, so most data is <strong>shared with everyone on your Jira site who can use the app</strong>:</p>
+    <ul>
+      <li><strong>Templates, sprint plans, holidays and leave</strong> are visible to every user of the app on your site. By default any app user can change them; a Jira administrator can restrict template changes to administrators.</li>
+      <li><strong>Saved reports</strong> are either <em>private</em> — visible only to the person who saved them — or <em>public</em> — visible to every app user on the site. Only the owner (or a Jira administrator) can change or delete a saved report.</li>
+      <li><strong>Settings</strong> are visible to all app users and can be changed only by Jira administrators.</li>
+      <li><strong>Your last selection</strong> is used only for you.</li>
+    </ul>
+    <p>Data never crosses between Jira sites: each site's installation has its own separate storage.</p>
+  </section>
+
+  <section class="card" id="where">
+    <h2>Where data is processed</h2>
+    <p>All processing happens within Atlassian's Forge platform. The app's backend declares <strong>no outbound network access</strong> — its manifest contains no egress permissions for its functions, which Atlassian enforces at the platform level — so it cannot send your data to TheTechFreaks or to any other destination.</p>
+    <p>One thing is loaded from outside Jira: to show <strong>people's profile pictures</strong>, your browser loads avatar images from Atlassian's avatar service and, for some accounts, from <a href="https://gravatar.com">Gravatar</a> (<code>secure.gravatar.com</code>). This is the same way Jira itself shows avatars. When your browser requests an avatar, the image host receives the usual information included in any web request, such as your IP address and browser type. The app sends no other data to these hosts.</p>
+    <h3 id="licence">Subscription status (Capacity Planner Pro only)</h3>
+    <p>For the paid edition, Atlassian tells the app whether your site's subscription is active. The app uses this only to decide whether to let you in, and does not store it. Billing is handled entirely by Atlassian; TheTechFreaks does not receive or store payment details.</p>
+  </section>
+
+  <section class="card" id="logs">
+    <h2>Diagnostic logs</h2>
+    <p>Like any Forge app, the app writes diagnostic messages to Atlassian's logging platform. These can be viewed by TheTechFreaks only if your site administrator has enabled log sharing for the app.</p>
+    <p>What may appear in those logs:</p>
+    <ul>
+      <li>Error messages and stack traces when something unexpected fails, which can include the text of an error returned by Jira.</li>
+    </ul>
+    <p>The app does not deliberately log issue content, estimates, capacity figures, leave or people's names. Log retention is controlled by Atlassian, not by TheTechFreaks.</p>
+  </section>
+
+  <section class="card" id="exports">
+    <h2>Exports</h2>
+    <p>CSV exports are assembled in your own browser and either saved directly to your device or shown for you to copy. They are not uploaded, emailed, or transmitted anywhere, and TheTechFreaks never receives a copy.</p>
+    <p>Once a file is on your device it is outside the app's control. Exports contain people's names, roles and capacity figures, so handle and share them according to your organisation's own policies.</p>
+  </section>
+
+  <section class="card" id="retention">
+    <h2>Retention and deletion</h2>
+    <p>Stored data persists until it is deleted in the app or the app is uninstalled.</p>
+    <ul>
+      <li><strong>Templates, holidays, leave and saved reports</strong> — delete them in the app. This removes them immediately and permanently.</li>
+      <li><strong>Sprint plans</strong> — use <em>Remove plan</em> in Capacity tracking. A sprint plan keeps its own copy of the template it was planned with, so deleting a template does not remove plans already made from it.</li>
+      <li><strong>Remove everything</strong> — uninstalling the app from your Jira site removes its Forge storage, including all templates, plans, holidays, leave, saved reports, settings and preferences, in line with Atlassian's data deletion process.</li>
+    </ul>
+    <p>If someone leaves your organisation, an app user can remove them from templates and delete their leave entries; their name and account ID will remain only in older sprint plans and saved reports until those are deleted.</p>
+  </section>
+
+  <section class="card" id="third-parties">
+    <h2>Third parties</h2>
+    <p>The app uses no analytics, no advertising, no tracking pixels and no third-party services of its own. It sets no cookies of its own. Atlassian is the processor involved, as the platform the app runs on and the system your Jira data already lives in. As described above, profile pictures may be loaded from Gravatar, as they are in Jira.</p>
+  </section>
+
+  <section class="card" id="contact">
+    <h2>Contact</h2>
+    <p>For privacy questions about this app, or to exercise rights you have over your personal data, contact TheTechFreaks at <strong>[privacy contact email — to be completed]</strong>.</p>
+    <p>Because most planning data is entered and managed by your own team, many requests — such as correcting or removing someone's leave or template entry — can be handled directly by your colleagues or your Jira administrator in the app.</p>
+  </section>
+
+  <section class="card">
+    <h2>Changes to this policy</h2>
+    <p>If the app's data handling changes — for example if it ever gains outbound network access or begins storing additional data — this policy will be updated before that version is released, and the "last updated" date above will change.</p>
+  </section>
+
+</main>
+<footer>
+  <div class="wrap">TheTechFreaks · Capacity Planner for Jira</div>
+</footer>
+</body>
+</html>
